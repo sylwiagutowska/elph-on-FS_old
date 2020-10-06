@@ -138,7 +138,7 @@ for i in range(len(NONEQ2)-1):
   if not(x[0]==y[0] and x[1]==y[1] and x[2]==y[2]):
    NONEQ.append(x)
 print len(NONEQ)
-
+'''
 
 for nq in NONEQ:
  # print nq
