@@ -110,27 +110,24 @@ B_vectors=[e[2]+0.5*(e[0]+e[1]),e[1]+0.5*(e[0]+e[2]),e[0]+0.5*(e[1]+e[2]),\
 A_vectors=[ [round(kk,PRECIS+2) for kk in m] for m in A_vectors]
 B_vectors=[ [round(kk,PRECIS+2) for kk in m] for m in B_vectors]
 
-#NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
-NONEQ2=[]
 
+NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
+NONEQ=[ [ (sum([v[m]*np.linalg.inv(np.transpose(e))[m2][m] for m in range(3)])) for m2 in range(3)] for v in NONEQ]
+#NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
+NONEQ=[ [ int(no_of_kpoints[0]*v[m]) for m in range(3)] for v in NONEQ]
+NONEQ2=[]
 #trans
+
+e2=no_of_kpoints[0]*np.array([[1,0,0],[0,1,0],[0,0,1]])
 
 for nq in NONEQ:
    for h1 in pm:
     for k1 in pm:
      for l1 in pm:
-      k_point2=nq+(h1*e[0]+k1*e[1]+l1*e[2]) 
+      k_point2=[int(m) for m in nq+(h1*e2[0]+k1*e2[1]+l1*e2[2]) ]
       sign0=0
-      for numa,a in enumerate(A_vectors):
-  #    if k_point2[0]*B_vectors[numa][0]+ k_point2[1]*B_vectors[numa][1]+k_point2[2]*B_vectors[numa][2]>=0:
-        ra=k_point2-B_vectors[numa]
-        scalar_product=sum([a[i]*ra[i] for i in range(3)])
-        if scalar_product>0 or (numa<3 and scalar_product==0): 
-         sign0=1
-         break
-      if sign0==0:
-        NONEQ2.append([round(kk,PRECIS) for kk in k_point2])
-
+      if k_point2[0]>=0 and k_point2[0]<no_of_kpoints[0] and k_point2[1]>=0 and k_point2[1]<no_of_kpoints[0] and k_point2[2]>=0 and k_point2[2]<no_of_kpoints[0]:
+       NONEQ2.append(k_point2)
 
 NONEQ2=sorting(NONEQ2)
 
@@ -146,24 +143,15 @@ print len(NONEQ)
 for nq in NONEQ:
  # print nq
   for sym in SYMM:
-   x=[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
+   x=np.array([int(sum([sym[m1][m2]*nq[m2] for m2 in range(3)])) for m1 in range(3)])
    #if x[0]<maxe[0] and x[1]<maxe[1] and x[2]<maxe[2] and x[0]>-maxe[0] and x[1]>-maxe[1] and x[2]>-maxe[2]:
   # allk.append([round(kk,PRECIS) for kk in x])
    for h1 in pm:
     for k1 in pm:
      for l1 in pm:
-      k_point2=x-(h1*e[0]+k1*e[1]+l1*e[2]) 
-      sign0=0
-      for numa,a in enumerate(A_vectors):
-     #  if k_point2[0]*a[0]>=0 and k_point2[1]*a[1]>=0 and k_point2[2]*a[2]>=0:
-        ra=k_point2-B_vectors[numa]
-        scalar_product=sum([a[i]*ra[i] for i in range(3)])
-        if scalar_product>0  or (numa<3 and scalar_product==0): 
-         sign0=1
-         break
-      if sign0==0:
-        allk.append([round(kk,PRECIS) for kk in k_point2])
-
+      k_point2=[int(m) for m in x-(h1*e2[0]+k1*e2[1]+l1*e2[2]) ]
+      if k_point2[0]>=0 and k_point2[0]<no_of_kpoints[0] and k_point2[1]>=0 and k_point2[1]<no_of_kpoints[0] and k_point2[2]>=0 and k_point2[2]<no_of_kpoints[0]:
+       allk.append(k_point2)
 
 print len(allk)
 allk2=sorting(allk)
