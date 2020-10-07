@@ -1,9 +1,10 @@
+
 dir='tmp_dir/_ph0/ir.phsave/'
 import xml.etree.ElementTree as ET
 import numpy as np
 from operator import itemgetter
 
-PRECIS=5
+PRECIS=3
 def sorting(allk2):
  Xall=[]
  allk2=sorted(allk2, key=itemgetter(0))
@@ -92,7 +93,7 @@ SYMM=[np.array([[1,0,0],[0,1,0],[0,0,1]])]
 for neighbor in root.iter('rotation'):
      tmp=neighbor.text.split()
      tmp2=np.array([ [ float(m) for m in tmp[0:3]], [float(m) for m in tmp[3:6]], [float(m) for m in tmp[6:9]]])
-     SYMM.append(np.dot((np.linalg.inv(e)),(np.dot((tmp2),e))))
+     SYMM.append(np.dot(((e)),(np.dot((tmp2),np.linalg.inv(e)))))
 print len(SYMM)
 ### 
 
@@ -105,17 +106,13 @@ mmm=0
 pm=[-1,0.,1,-2,2]
 
 
-
-NONEQ=[ [ round(sum([v[m]*((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
+#NONEQ=[ [ round(sum([v[m]*((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
 #NONEQ=[ [ (sum([v[m]*np.linalg.inv((e))[m2][m] for m in range(3)])) for m2 in range(3)] for v in NONEQ]
 #NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
-NONEQ=[ [ int(no_of_kpoints[0]/2*v[m]) for m in range(3)] for v in NONEQ]
-e2=no_of_kpoints[0]*np.array([[1,0,0],[0,1,0],[0,0,1]])
-NONEQ=sorting(NONEQ)
-'''
+NONEQ=[ [ int(no_of_kpoints[0]*v[m]) for m in range(3)] for v in NONEQ]
 NONEQ2=[]
-#trans
-print len(NONEQ)
+
+e2=no_of_kpoints[0]*np.array([[1,0,0],[0,1,0],[0,0,1]])
 
 for nq in NONEQ:
    for h1 in pm:
@@ -135,18 +132,19 @@ for i in range(len(NONEQ2)-1):
   if not(x[0]==y[0] and x[1]==y[1] and x[2]==y[2]):
    NONEQ.append(x)
 print len(NONEQ)
-'''
+
 
 for nq in NONEQ:
  # print nq
   for sym in SYMM:
    x=np.array([int(sum([sym[m2][m1]*nq[m2] for m2 in range(3)])) for m1 in range(3)])
    #if x[0]<maxe[0] and x[1]<maxe[1] and x[2]<maxe[2] and x[0]>-maxe[0] and x[1]>-maxe[1] and x[2]>-maxe[2]:
+  # allk.append([round(kk,PRECIS) for kk in x])
    for h1 in pm:
     for k1 in pm:
      for l1 in pm:
       k_point2=[int(m) for m in x-(h1*e2[0]+k1*e2[1]+l1*e2[2]) ]
-      if k_point2[0]>=-no_of_kpoints[0]/2 and k_point2[0]<no_of_kpoints[0]/2 and k_point2[1]>=-no_of_kpoints[0]/2 and k_point2[1]<no_of_kpoints[0]/2 and k_point2[2]>=-no_of_kpoints[0]/2 and k_point2[2]<no_of_kpoints[0]/2:
+      if k_point2[0]>=0 and k_point2[0]<no_of_kpoints[0] and k_point2[1]>=0 and k_point2[1]<no_of_kpoints[0] and k_point2[2]>=0 and k_point2[2]<no_of_kpoints[0]:
        allk.append(k_point2)
 
 print len(allk)
@@ -254,4 +252,3 @@ for file in range(1,2):
 
  print len(COLORS)
 
-###
