@@ -172,7 +172,7 @@ allk=[]
 for i in range(len(allk2)-1):
   x=allk2[i]
   y=allk2[i+1]
-  if not(x[0]==y[0] and x[1]==y[1] and x[2]==y[2]):
+  if not(abs(x[0]-y[0])<1e-3 and abs(x[1]-y[1])<1e-3 and abs(x[2]-y[2])<1e-3):
    allk.append(x)
 print len(allk)
 
@@ -186,7 +186,7 @@ for i in allk:
 h.close()
 
 allk=[ [ round(sum([v[m]*np.linalg.inv(np.transpose(e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in allk]
-allk=sorting(allk)
+allk=sorting([i for i in allk if i[0]!=1 and i[1]!=1 and i[2]!=1])
 
 
 h=open('kpoints0.dat','w')
