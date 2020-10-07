@@ -167,6 +167,7 @@ for i in allk:
  h.write('\n')
 h.close()
 
+#rearrange
 allk2=[ [ round(no_of_kpoints[0]*round(sum([v[m]*einv[m2][m] for m in range(3)]),PRECIS)) for m2 in range(3)]+[nv] for nv,v in enumerate(allk)]
 allk2=sorting(allk2)
 allk=[ allk[i[3]] for i in allk2 if i[0]<no_of_kpoints[0]  and i[1]<no_of_kpoints[0] and i[2]<no_of_kpoints[0]]
@@ -225,52 +226,52 @@ for f in FREQ:
 ####
 
 ###read elph matrix
-for file in range(1,2):
- for j in range(1,len(NONDEG[file-1])+1):
+for file in range(2,3):
+ for mode in range(1,len(NONDEG[file-1])+1):
   KPOINTS,ELPH,COLORS=[],[],[]
-  ELPH_allk=[]
-  tree = ET.parse(dir+'elph.'+str(file)+'.'+str(j)+'.xml')
+  tree = ET.parse(dir+'elph.'+str(file)+'.'+str(mode)+'.xml')
   root = tree.getroot()
   for country in root.iter('PARTIAL_EL_PHON'):
    nkp=int(country.find('NUMBER_OF_K').text)
-   nbnd_el=int(country.find('NUMBER_OF_BANDS').text)
    nbnd_el=int(country.find('NUMBER_OF_BANDS').text)
    for k in range(1,nkp+1):
     for town in country.iter('K_POINT.'+str(k)):
      KPOINTS.append([ round(float(m),PRECIS) for m in town.find('COORDINATES_XK').text.split() ])
   #   print town.find('PARTIAL_ELPH').text.split('\n')
-     elph_k=([ [ float(m.replace(',',' ').split()[0])**2+float(m.replace(',',' ').split()[1])**2 for m in town.find('PARTIAL_ELPH').text.split('\n') if len(m.split())>0 ] ])
+     elph_k=([  (float(m.replace(',',' ').split()[0])**2+float(m.replace(',',' ').split()[1])**2) for m in town.find('PARTIAL_ELPH').text.split('\n') if len(m.split())>0  ])
      ELPH.append([ sum(elph_k[nbnd_el*i:nbnd_el*(i+1)]) for i in bands_num]) #choose only bands which cross EF and sum over j in pairs <i,j>
+
+  
 #  print KPOINTS
   for num_noneqk,noneqk in enumerate(NONEQ):
    colored=0
    for numk,k in enumerate(KPOINTS):
     if (k[0]==noneqk[0]) and  (k[1]==noneqk[1]) and  (k[2]==noneqk[2]):
-     print 'am',
      COLORS.append(ELPH[numk])
      colored=1
      break
    if colored==0:
     COLORS.append([0 for i in bands_num])
- COLORS=np.transpose(np.array(COLORS)) #COLORS[nbnd][nkp]
- print len(COLORS),[len(i) for i in COLORS]
- print len(ENE),[len(i) for i in ENE]
- print len(allk)
- h=open('elph.frmsf','w')
- h.write(str(no_of_kpoints[0])+' '+str(no_of_kpoints[1])+' '+str(no_of_kpoints[2])+'\n')
- h.write('1\n'+str(len(bands_num))+'\n')
- for i in e:
-  for j in i:
-   h.write(str(j)+' ')
-  h.write('\n')
- for bnd in ENE:
-  for k in allk:
-   h.write(str(bnd[k[3]])+'\n')
-# for bnd in COLORS:
-#  for k in allk:
-#   h.write(str(bnd[k[3]])+'\n')
- h.close()
+  COLORS=np.transpose(np.array(COLORS)) #COLORS[nbnd][nkp]
+  print nbnd_el,bands_num
+  print len(COLORS),[len(i) for i in COLORS]
+  print len(ENE),[len(i) for i in ENE]
+  print len(allk)
+  h=open('elph'+str(mode)+'.frmsf','w')
+  h.write(str(no_of_kpoints[0])+' '+str(no_of_kpoints[1])+' ' +str(no_of_kpoints[2])+'\n')
+  h.write('1\n'+str(len(bands_num))+'\n')
+  for i in e:
+   for j in i:
+    h.write(str(j)+' ')
+   h.write('\n')
+  for bnd in ENE:
+   for k in allk:
+    h.write(str(bnd[k[3]])+'\n')
+  for bnd in COLORS:
+   for k in allk:
+    h.write(str(bnd[k[3]])+'\n')
+  h.close()
 
- print len(COLORS)
+
 
 ###
