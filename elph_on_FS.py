@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from operator import itemgetter
 
-PRECIS=3
+PRECIS=6
 def sorting(allk2):
  Xall=[]
  allk2=sorted(allk2, key=itemgetter(0))
@@ -44,8 +44,8 @@ Ha_to_ev=13.605662285137*2
 #file=raw_input('Path and name of *.xml file, eq. Pb or tmp_dir/Pb: ')
 tree = ET.parse('FS/tmp_dir/ir.xml')
 root = tree.getroot()
-ENE=[]
-NONEQ=[]
+ENE=[] #ENE[i][j] , i -no of kpoint, j-no of band
+NONEQ=[] #NONEQ[0:3]=kpoint, NONEQ[3]=no of kpoint
 
 for i in root.findall('output/band_structure/fermi_energy'):
  ef=float(i.text.split()[0])
@@ -55,28 +55,35 @@ for i in root.findall('output/band_structure/starting_k_points/monkhorst_pack'):
  no_of_kpoints=[ int(i.get('nk1')),int(i.get('nk2')),int(i.get('nk3'))]
 print( no_of_kpoints)
 
+
+mmm=0
 for i in root.findall('output/band_structure/ks_energies'):
     for actor in i.findall('eigenvalues'):
-     ENE.append([float(m) for m in  actor.text.split()])
+     ENE.append([float(m)-ef for m in  actor.text.split()])
     for actor in i.findall('k_point'):
      NONEQ.append([round(float(m),PRECIS) for m in  actor.text.split()])
+     NONEQ[-1].append(mmm)
+     mmm=mmm+1
 
 maks=max([ len(i) for i in ENE])
 ENE2= [ [] for i in range(maks)]
 below_ENE=[ 0 for i in range(maks)]
 top_ENE=[ 0 for i in range(maks)]
 
+#choose only complete bands
 for i in ENE:
  for (numj,j) in enumerate(i):
   ENE2[numj].append(j)
-  if j<ef: below_ENE[numj]=1
-  elif j>ef: top_ENE[numj]=1
+  if j<0: below_ENE[numj]=1
+  elif j>0: top_ENE[numj]=1
 bands_num=[]
 #print('\nList of bands, which cross the Fermi level and its energy ranges:')
 for i in range(maks):
  if below_ENE[i] and top_ENE[i]: 
   bands_num.append(i)
 minband,maxband=bands_num[0],bands_num[-1]
+
+ENE=ENE2[minband:maxband+1] #np.transpose(np.array(ENE2)) #ENE=[] #ENE[i][j] , i - no of band, j-no of kpoint
 
 #reciprocal lattice vectors
 e=[]
@@ -92,7 +99,7 @@ SYMM=[np.array([[1,0,0],[0,1,0],[0,0,1]])]
 for neighbor in root.iter('rotation'):
      tmp=neighbor.text.split()
      tmp2=np.array([ [ float(m) for m in tmp[0:3]], [float(m) for m in tmp[3:6]], [float(m) for m in tmp[6:9]]])
-     SYMM.append(np.dot((np.linalg.inv(e)),(np.dot(tmp2,e))))
+     SYMM.append(np.transpose(np.dot((np.linalg.inv(e)),(np.dot(tmp2,e)))))
 print len(SYMM)
 ### 
 
@@ -102,69 +109,46 @@ print len(SYMM)
 
 allk=[]
 mmm=0
-pm=[-1,0.,1,-2,2]
-A_vectors=[np.cross(e[0],e[1]),np.cross(e[2],e[0]),np.cross(e[1],e[2]),\
+pm=[-1,0.,1]
+A_vectors=[1.1*np.cross(e[0],e[1]),np.cross(e[2],e[0]),np.cross(e[1],e[2]),\
            -np.cross(e[0],e[1]),-np.cross(e[2],e[0]),-np.cross(e[1],e[2])]
 B_vectors=[e[2]+0.5*(e[0]+e[1]),e[1]+0.5*(e[0]+e[2]),e[0]+0.5*(e[1]+e[2]),\
 0.5*(e[0]+e[1]),0.5*(e[0]+e[2]),0.5*(e[1]+e[2]) ]
-A_vectors=[ [round(kk,PRECIS+2) for kk in m] for m in A_vectors]
-B_vectors=[ [round(kk,PRECIS+2) for kk in m] for m in B_vectors]
+A_vectors=[ [round(kk,PRECIS) for kk in m] for m in A_vectors]
+B_vectors=[ [round(kk,PRECIS) for kk in m] for m in B_vectors]
 
-#NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
+#NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)]+[v[3]] for v in NONEQ]
 NONEQ2=[]
-
-#trans
-
-for nq in NONEQ:
-   for h1 in pm:
-    for k1 in pm:
-     for l1 in pm:
-      k_point2=nq+(h1*e[0]+k1*e[1]+l1*e[2]) 
-      sign0=0
-      for numa,a in enumerate(A_vectors):
-  #    if k_point2[0]*B_vectors[numa][0]+ k_point2[1]*B_vectors[numa][1]+k_point2[2]*B_vectors[numa][2]>=0:
-        ra=k_point2-B_vectors[numa]
-        scalar_product=sum([a[i]*ra[i] for i in range(3)])
-        if scalar_product>0 or (numa<3 and scalar_product==0): 
-         sign0=1
-         break
-      if sign0==0:
-        NONEQ2.append([round(kk,PRECIS) for kk in k_point2])
-
-
-NONEQ2=sorting(NONEQ2)
-
-NONEQ=[] 
-for i in range(len(NONEQ2)-1):
-  x=NONEQ2[i]
-  y=NONEQ2[i+1]
-  if not(x[0]==y[0] and x[1]==y[1] and x[2]==y[2]):
-   NONEQ.append(x)
-print len(NONEQ)
-
-
+einv=np.linalg.inv(np.transpose(e))
 for nq in NONEQ:
  # print nq
   for sym in SYMM:
    x=[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
-   #if x[0]<maxe[0] and x[1]<maxe[1] and x[2]<maxe[2] and x[0]>-maxe[0] and x[1]>-maxe[1] and x[2]>-maxe[2]:
-  # allk.append([round(kk,PRECIS) for kk in x])
    for h1 in pm:
     for k1 in pm:
      for l1 in pm:
-      k_point2=x-(h1*e[0]+k1*e[1]+l1*e[2]) 
+      k_point2=[round(kk,PRECIS) for kk in (x-(h1*e[0]+k1*e[1]+l1*e[2]))]
+      k_point3=[round(no_of_kpoints[m2]*\
+               round(sum([k_point2[m]*einv[m2][m] for m in range(3)]),PRECIS)\
+                     ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
+      if k_point3[0]>=0 and k_point3[0]<=no_of_kpoints[0] and \
+         k_point3[1]>=0 and k_point3[1]<=no_of_kpoints[1] and \
+         k_point3[2]>=0 and k_point3[2]<=no_of_kpoints[2]:
+         allk.append(k_point2)
+         allk[-1].append(nq[3])
+      '''
+      k_point2=x-(h1*e[0]+k1*e[1]+l1*e[2])
       sign0=0
       for numa,a in enumerate(A_vectors):
-     #  if k_point2[0]*a[0]>=0 and k_point2[1]*a[1]>=0 and k_point2[2]*a[2]>=0:
         ra=k_point2-B_vectors[numa]
-        scalar_product=sum([a[i]*ra[i] for i in range(3)])
-        if scalar_product>0  or (numa<3 and scalar_product==0): 
+        scalar_product=round(sum([a[i]*ra[i] for i in range(3)]),PRECIS)
+        if scalar_product>0: #  or (numa<3 and scalar_product==0): 
          sign0=1
          break
       if sign0==0:
         allk.append([round(kk,PRECIS) for kk in k_point2])
-
-
+        allk[-1].append(nq[3])
+      '''
 print len(allk)
 allk2=sorting(allk)
 
@@ -172,11 +156,9 @@ allk=[]
 for i in range(len(allk2)-1):
   x=allk2[i]
   y=allk2[i+1]
-  if not(abs(x[0]-y[0])<1e-3 and abs(x[1]-y[1])<1e-3 and abs(x[2]-y[2])<1e-3):
+  if not((x[0]==y[0]) and (x[1]==y[1]) and (x[2]==y[2])):
    allk.append(x)
 print len(allk)
-
-
 
 h=open('kpoints.dat','w')
 for i in allk:
@@ -185,12 +167,15 @@ for i in allk:
  h.write('\n')
 h.close()
 
-allk=[ [ round(sum([v[m]*np.linalg.inv(np.transpose(e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in allk]
-allk=sorting([i for i in allk if i[0]!=1 and i[1]!=1 and i[2]!=1])
+allk2=[ [ round(no_of_kpoints[0]*round(sum([v[m]*einv[m2][m] for m in range(3)]),PRECIS)) for m2 in range(3)]+[nv] for nv,v in enumerate(allk)]
+allk2=sorting(allk2)
+allk=[ allk[i[3]] for i in allk2 if i[0]<no_of_kpoints[0]  and i[1]<no_of_kpoints[0] and i[2]<no_of_kpoints[0]]
 
+#allk=sorting(allk)
+print(len(allk))
 
 h=open('kpoints0.dat','w')
-for i in allk:
+for i in allk2:
  for j in i:
   h.write(str(j)+' ')
  h.write('\n')
@@ -243,6 +228,7 @@ for f in FREQ:
 for file in range(1,2):
  for j in range(1,len(NONDEG[file-1])+1):
   KPOINTS,ELPH,COLORS=[],[],[]
+  ELPH_allk=[]
   tree = ET.parse(dir+'elph.'+str(file)+'.'+str(j)+'.xml')
   root = tree.getroot()
   for country in root.iter('PARTIAL_EL_PHON'):
@@ -251,22 +237,39 @@ for file in range(1,2):
    nbnd_el=int(country.find('NUMBER_OF_BANDS').text)
    for k in range(1,nkp+1):
     for town in country.iter('K_POINT.'+str(k)):
-     KPOINTS.append([ float(m) for m in town.find('COORDINATES_XK').text.split() ])
+     KPOINTS.append([ round(float(m),PRECIS) for m in town.find('COORDINATES_XK').text.split() ])
   #   print town.find('PARTIAL_ELPH').text.split('\n')
      elph_k=([ [ float(m.replace(',',' ').split()[0])**2+float(m.replace(',',' ').split()[1])**2 for m in town.find('PARTIAL_ELPH').text.split('\n') if len(m.split())>0 ] ])
      ELPH.append([ sum(elph_k[nbnd_el*i:nbnd_el*(i+1)]) for i in bands_num]) #choose only bands which cross EF and sum over j in pairs <i,j>
-
-
+#  print KPOINTS
   for num_noneqk,noneqk in enumerate(NONEQ):
    colored=0
    for numk,k in enumerate(KPOINTS):
-    if (k[0]-noneqk[0])<1e-3 and  (k[1]-noneqk[1])<1e-3 and  (k[2]-noneqk[2])<1e-3:
+    if (k[0]==noneqk[0]) and  (k[1]==noneqk[1]) and  (k[2]==noneqk[2]):
+     print 'am',
      COLORS.append(ELPH[numk])
      colored=1
      break
    if colored==0:
-    COLORS.append([0 for i in ELPH[numk]])
-
+    COLORS.append([0 for i in bands_num])
+ COLORS=np.transpose(np.array(COLORS)) #COLORS[nbnd][nkp]
+ print len(COLORS),[len(i) for i in COLORS]
+ print len(ENE),[len(i) for i in ENE]
+ print len(allk)
+ h=open('elph.frmsf','w')
+ h.write(str(no_of_kpoints[0])+' '+str(no_of_kpoints[1])+' '+str(no_of_kpoints[2])+'\n')
+ h.write('1\n'+str(len(bands_num))+'\n')
+ for i in e:
+  for j in i:
+   h.write(str(j)+' ')
+  h.write('\n')
+ for bnd in ENE:
+  for k in allk:
+   h.write(str(bnd[k[3]])+'\n')
+# for bnd in COLORS:
+#  for k in allk:
+#   h.write(str(bnd[k[3]])+'\n')
+ h.close()
 
  print len(COLORS)
 
