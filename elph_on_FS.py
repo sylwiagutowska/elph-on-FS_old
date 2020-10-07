@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from operator import itemgetter
 
-PRECIS=3
+PRECIS=5
 def sorting(allk2):
  Xall=[]
  allk2=sorted(allk2, key=itemgetter(0))
@@ -84,7 +84,7 @@ for i in root.findall('output/basis_set/reciprocal_lattice'):
  e.append([round(float(m),PRECIS) for m in i.find('b1').text.split()])
  e.append([round(float(m),PRECIS) for m in i.find('b2').text.split()])
  e.append([round(float(m),PRECIS) for m in i.find('b3').text.split()])
-e=np.array(e)
+e=np.transpose(np.array(e))
 print e
 
 #symmetry operations
@@ -92,7 +92,7 @@ SYMM=[np.array([[1,0,0],[0,1,0],[0,0,1]])]
 for neighbor in root.iter('rotation'):
      tmp=neighbor.text.split()
      tmp2=np.array([ [ float(m) for m in tmp[0:3]], [float(m) for m in tmp[3:6]], [float(m) for m in tmp[6:9]]])
-     SYMM.append(np.dot((np.linalg.inv(e)),(np.dot(tmp2,e))))
+     SYMM.append(np.dot((np.linalg.inv(e)),(np.dot((tmp2),e))))
 print len(SYMM)
 ### 
 
@@ -103,22 +103,19 @@ print len(SYMM)
 allk=[]
 mmm=0
 pm=[-1,0.,1,-2,2]
-A_vectors=[np.cross(e[0],e[1]),np.cross(e[2],e[0]),np.cross(e[1],e[2]),\
-           -np.cross(e[0],e[1]),-np.cross(e[2],e[0]),-np.cross(e[1],e[2])]
-B_vectors=[e[2]+0.5*(e[0]+e[1]),e[1]+0.5*(e[0]+e[2]),e[0]+0.5*(e[1]+e[2]),\
-0.5*(e[0]+e[1]),0.5*(e[0]+e[2]),0.5*(e[1]+e[2]) ]
-A_vectors=[ [round(kk,PRECIS+2) for kk in m] for m in A_vectors]
-B_vectors=[ [round(kk,PRECIS+2) for kk in m] for m in B_vectors]
 
 
-NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
-NONEQ=[ [ (sum([v[m]*np.linalg.inv(np.transpose(e))[m2][m] for m in range(3)])) for m2 in range(3)] for v in NONEQ]
+
+NONEQ=[ [ round(sum([v[m]*((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
+#NONEQ=[ [ (sum([v[m]*np.linalg.inv((e))[m2][m] for m in range(3)])) for m2 in range(3)] for v in NONEQ]
 #NONEQ=[ [ round(sum([v[m]*np.transpose((e))[m2][m] for m in range(3)]),4) for m2 in range(3)] for v in NONEQ]
-NONEQ=[ [ int(no_of_kpoints[0]*v[m]) for m in range(3)] for v in NONEQ]
+NONEQ=[ [ int(no_of_kpoints[0]/2*v[m]) for m in range(3)] for v in NONEQ]
+e2=no_of_kpoints[0]*np.array([[1,0,0],[0,1,0],[0,0,1]])
+NONEQ=sorting(NONEQ)
+'''
 NONEQ2=[]
 #trans
-
-e2=no_of_kpoints[0]*np.array([[1,0,0],[0,1,0],[0,0,1]])
+print len(NONEQ)
 
 for nq in NONEQ:
    for h1 in pm:
@@ -126,7 +123,7 @@ for nq in NONEQ:
      for l1 in pm:
       k_point2=[int(m) for m in nq+(h1*e2[0]+k1*e2[1]+l1*e2[2]) ]
       sign0=0
-      if k_point2[0]>=0 and k_point2[0]<no_of_kpoints[0] and k_point2[1]>=0 and k_point2[1]<no_of_kpoints[0] and k_point2[2]>=0 and k_point2[2]<no_of_kpoints[0]:
+      if k_point2[0]>=0 and k_point2[0]<=no_of_kpoints[0] and k_point2[1]>=0 and k_point2[1]<=no_of_kpoints[0] and k_point2[2]>=0 and k_point2[2]<=no_of_kpoints[0]:
        NONEQ2.append(k_point2)
 
 NONEQ2=sorting(NONEQ2)
@@ -143,14 +140,13 @@ print len(NONEQ)
 for nq in NONEQ:
  # print nq
   for sym in SYMM:
-   x=np.array([int(sum([sym[m1][m2]*nq[m2] for m2 in range(3)])) for m1 in range(3)])
+   x=np.array([int(sum([sym[m2][m1]*nq[m2] for m2 in range(3)])) for m1 in range(3)])
    #if x[0]<maxe[0] and x[1]<maxe[1] and x[2]<maxe[2] and x[0]>-maxe[0] and x[1]>-maxe[1] and x[2]>-maxe[2]:
-  # allk.append([round(kk,PRECIS) for kk in x])
    for h1 in pm:
     for k1 in pm:
      for l1 in pm:
       k_point2=[int(m) for m in x-(h1*e2[0]+k1*e2[1]+l1*e2[2]) ]
-      if k_point2[0]>=0 and k_point2[0]<no_of_kpoints[0] and k_point2[1]>=0 and k_point2[1]<no_of_kpoints[0] and k_point2[2]>=0 and k_point2[2]<no_of_kpoints[0]:
+      if k_point2[0]>=-no_of_kpoints[0]/2 and k_point2[0]<no_of_kpoints[0]/2 and k_point2[1]>=-no_of_kpoints[0]/2 and k_point2[1]<no_of_kpoints[0]/2 and k_point2[2]>=-no_of_kpoints[0]/2 and k_point2[2]<no_of_kpoints[0]/2:
        allk.append(k_point2)
 
 print len(allk)
