@@ -9,6 +9,7 @@ class structure():
   self.allk=[]
   self.NONEQ=[]
   self.pm=[0,1,-1]
+  self.at=[]
   self.e=[]
   self.SYMM=[]
   self.no_of_kpoints=[]
@@ -36,6 +37,14 @@ class structure():
    self.e.append([round(float(m),PRECIS) for m in i.find('b3').text.split()])
   self.e=np.array(self.e)
   print self.e
+
+  # lattice vectors
+  for i in root.findall('output/atomic_structure/cell'):
+   self.at.append([round(float(m),PRECIS) for m in i.find('a1').text.split()])
+   self.at.append([round(float(m),PRECIS) for m in i.find('a2').text.split()])
+   self.at.append([round(float(m),PRECIS) for m in i.find('a3').text.split()])
+  self.at=np.array(self.at)
+  print self.at
 
   #symmetry operations
   self.SYMM=[np.array([[1,0,0],[0,1,0],[0,0,1]])]
@@ -89,7 +98,32 @@ class structure():
      allk.append(x)
   print len(allk)
   return allk
-  
+ 
+ ''' doesnot work 
+ def check_symm(self):
+  SYMM2=[]
+  einv=np.linalg.inv(np.transpose(self.e))
+  for sym in self.SYMM:
+   found=0
+   for nq in self.NONEQ:
+    x=[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
+    for h1 in self.pm:
+     for k1 in self.pm:
+      for l1 in self.pm:
+       kp=[round(kk,PRECIS) for kk in 
+                 (x-(h1*self.e[0]+k1*self.e[1]+l1*self.e[2]))]
+       if kp[0]==nq[0] and  kp[1]==nq[1] and  kp[2]==nq[2]:
+        found=1
+        break
+      if found==1: break
+     if found==1: break
+    if found==1: break
+   if found==0: SYMM2.append(sym)
+
+  print(len(SYMM2))
+  self.SYMM=SYMM2
+ '''
+
  def make_kgrid(self):
   allk2=[]
   einv=np.linalg.inv(np.transpose(self.e))

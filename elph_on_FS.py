@@ -18,8 +18,8 @@ el_structure.read_el_structure()
 
 ph_structure=ph_structure.ph_structure()
 ph_structure.read_ph_structure()
-
-
+ph_structure.check_symm_of_q(structure)
+ph_structure.read_patterns()
 elph_structure=elph_structure.elph_structure()
 elph_structure.make_kpoints_single_q(2,structure)
 elph_structure.read_elph_single_q(2,ph_structure,el_structure)

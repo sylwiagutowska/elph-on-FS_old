@@ -3,6 +3,7 @@ Ha_to_ev=13.605662285137*2
 
 class el_structure():
  def __init__(self):
+  self.ENE_fs=[]
   self.ENE=[]
   self.ef=0.
   self.bands_num=[]
@@ -37,6 +38,7 @@ class el_structure():
     self.bands_num.append(i)
   self.minband,self.maxband=self.bands_num[0],self.bands_num[-1]
 
-  self.ENE=ENE2[self.minband:self.maxband+1] #np.transpose(np.array(ENE2)) #ENE=[] #ENE[i][j] , i - no of band, j-no of kpoint
+  self.ENE=ENE2
+  self.ENE_fs=ENE2[self.minband:self.maxband+1] #np.transpose(np.array(ENE2)) #ENE=[] #ENE[i][j] , i - no of band, j-no of kpoint
 
 
