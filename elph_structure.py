@@ -11,9 +11,9 @@ class elph_structure():
   self.nkp=0
   self.KPOINTS_all=[]
 
- def make_kpoints_single_q(self,file,basic_structure):
+ def make_kpoints_single_q(self,q,basic_structure):
   self.pm=[0,-1,1]
-  tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.1.xml')
+  tree = ET.parse(self.elph_dir+'elph.'+str(q)+'.1.xml')
   root = tree.getroot()
   self.nkp=int(root.find('PARTIAL_EL_PHON/NUMBER_OF_K').text)
   self.KPOINTS=[ [ round(float(m),PRECIS)\
@@ -47,12 +47,6 @@ class elph_structure():
   self.KPOINTS_all=structure_new.allk
   
 
- def transform_matrix_to_crystal(self,mat,at):
-  return [[ sum([ sum([ mat[k][l]*at[k][i]*at[l][j] for l in range(3)]) for k in range(3)]) for j in range(3)] for i in range(3)]
-
- def transform_matrix_to_cartesian(self,mat,e):
-  return [[ sum([ sum([ mat[k][l]*e[i][k]*e[j][l] for l in range(3)]) for k in range(3)]) for j in range(3)] for i in range(3)]
-
  def w0gauss(self,x):
   degauss=0.02
   sqrtpm1= 1. / 1.77245385090551602729
@@ -60,24 +54,71 @@ class elph_structure():
   arg = min (200., (x - 1.0 /  (2.0)**0.5 ) **2.)
   return sqrtpm1 * np.exp ( - arg) * (2.0 - ( 2.0)**0.5 * x)/0.02
 
- '''
- def symmetrize(self,ph_structure):
-  
-  for na in range(ph_structure.nat):
-   for nb in range(ph_structure.nat):
+
+ def dyn_to_cart(self,nat,pat,matrix):
+  DYN_PHI=[[[[complex(0,0) for i in range(3)] for j in range(3)] for nb in range(3*nat)] for na in range(3*nat)]
+  for i in range(nat):
+     na =int( i / 3) 
+     icart = i - 3 * (na )
+     for j in range(3*nat):
+        nb = int(j/3)
+        jcart = j - 3 * (nb)
+        work = complex(0,0)
+        for mu in range(3*nat):
+         for nu in range(3*nat):
+          work = work +pat[mu][i]*matrix[mu][nu] * pat[nu][j].conjugate()
+        DYN_PHI [na][nb][icart][jcart] = work
+  return DYN_PHI
+
+ def transform_matrix_to_crystal(self,mat,at):
+  return [[ sum([ sum([ mat[k][l]*at[k][i]*at[l][j] for l in range(3)]) for k in range(3)]) for j in range(3)] for i in range(3)]
+
+ def transform_matrix_to_cartesian(self,mat,e):
+  return [[ sum([ sum([ mat[k][l]*e[i][k]*e[j][l] for l in range(3)]) for k in range(3)]) for j in range(3)] for i in range(3)]
+
+ def symmetrize(phi,nat,minus_q)
+  !    We start by imposing hermiticity
+  for na in range(nat):
+   for nb in range(nat):
+    for ipol in range(3):
+     for jpol in range(3):
+      phi[na][nb][ipol][jpol]= 0.5*(phi[na][nb][ipol][jpol]+(phi[nb][na][jpol][ipol].conjugate() )
+      phi[nb][na][jpol][ipol] =phi[na][nb][ipol][jpol].conjugate()
+  !    Then we impose the symmetry q -> -q+G if present
+  if (minus_q):
+   for na in range(nat):
+    for nb in range(nat):
+     work=[[complex(0,0) for i in range(3)] for j in range(3)]
      for ipol in range(3):
-       for ipol in range(3):
-              self.ELPH_sum(ipol, jpol, na, nb) = 0.5d0 * (phi (ipol, jpol, na, nb) &
-                   + CONJG(phi (jpol, ipol, nb, na) ) )
-              phi (jpol, ipol, nb, na) = CONJG(phi (ipol, jpol, na, nb) )
+      for jpol in range(3):
+                 sna = irt (irotmq, na)
+                 snb = irt (irotmq, nb)
+                 arg = 0.d0
+                 do kpol = 1, 3
+                    arg = arg + (xq (kpol) * (rtau (kpol, irotmq, na) - &
+                                              rtau (kpol, irotmq, nb) ) )
+                 enddo
+                 arg = arg * tpi
+                 fase = CMPLX(cos (arg), sin (arg) ,kind=DP)
+                 do kpol = 1, 3
+                    do lpol = 1, 3
+                       work (ipol, jpol) = work (ipol, jpol) + &
+                            s (ipol, kpol, irotmq) * s (jpol, lpol, irotmq) &
+                            * phi (kpol, lpol, sna, snb) * fase
+                    enddo
+                 enddo
+                 phip (ipol, jpol, na, nb) = (phi (ipol, jpol, na, nb) + &
+                      CONJG( work (ipol, jpol) ) ) * 0.5d0
+              enddo
            enddo
         enddo
      enddo
-  enddo  
- '''
+     phi = phip
+  endif
 
- def read_elph_single_q(self,file,ph_structure,el_structure): #read info from first file
-  tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.1.xml')
+
+ def read_elph_single_q(self,q,ph_structure,el_structure,structure): #read info from first file
+  tree = ET.parse(self.elph_dir+'elph.'+str(q)+'.1.xml')
   root = tree.getroot()
   self.nbnd_el=int(root.find('PARTIAL_EL_PHON/NUMBER_OF_BANDS').text)
   ELPH=[[[ [] for k in range(self.nkp)] for j in range(self.nbnd_el)] for i in range(self.nbnd_el)] #stores elph[k][ibnd][jbnd][nmode]
@@ -85,9 +126,9 @@ class elph_structure():
 #stores elph[k][ibnd][nmode][mmode]
 
   #read elph  from all files
-  for mode in range(1,len(ph_structure.NONDEG[file-1])+1):
+  for mode in range(1,len(ph_structure.NONDEG[q-1])+1):
    #elph
-   tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.'+str(mode)+'.xml')
+   tree = ET.parse(self.elph_dir+'elph.'+str(q)+'.'+str(mode)+'.xml')
    root = tree.getroot()
    for country in root.iter('PARTIAL_EL_PHON'):
     for k in range(1,self.nkp+1):
@@ -113,8 +154,13 @@ class elph_structure():
                 self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[k-1][4]])*\
                 ELPH[jband][iband][k-1][iipert].conjugate()*\
                 ELPH[jband][iband][k-1][jjpert]
-
-
+  for jband in range(self.nbnd_el):
+    for k in range(1,self.nkp+1):
+      self.ELPH_sum[jband][k-1]=\
+               self.dyn_to_cart(ph_structure.nat,ph_structure.PATT[q-1],\
+                                self.ELPH_sum[jband][k-1])
+      self.ELPH_sum[jband][k-1]=\
+		self.transform_matrix_to_crystal(self.ELPH_sum[jband][k-1],structure.at)
 
  def elph_single_q_in_whole_kgrid(self,q,structure,ph_structure,el_structure):
  #choose only bands which cross EF and sum over j in pairs <i,j>

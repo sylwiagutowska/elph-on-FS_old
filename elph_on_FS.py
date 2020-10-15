@@ -22,6 +22,6 @@ ph_structure.check_symm_of_q(structure)
 ph_structure.read_patterns()
 elph_structure=elph_structure.elph_structure()
 elph_structure.make_kpoints_single_q(2,structure)
-elph_structure.read_elph_single_q(2,ph_structure,el_structure)
+elph_structure.read_elph_single_q(2,ph_structure,el_structure,structure)
 elph_structure.elph_single_q_in_whole_kgrid(2,structure,ph_structure,el_structure)
 ###

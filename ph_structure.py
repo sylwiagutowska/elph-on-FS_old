@@ -12,6 +12,7 @@ class ph_structure():
   self.SYMMQ=[]
   self.PATT=[]
   self.elph_dir='tmp_dir/_ph0/ir.phsave/'
+  self.MINUS_Q_SYM=[]
 
  def read_dyn_of_q(self,tmp):
   for ni,i in enumerate(tmp):
@@ -94,20 +95,26 @@ class ph_structure():
      if found==1: 
       self.SYMMQ[-1].append(sym)
       break
-  for i in self.SYMMQ: print len(i)
-       
+
 
  def read_patterns(self):
   for q in range(len(self.Q)):
    self.PATT.append([])
    tree = ET.parse(self.elph_dir+'/patterns.'+str(q+1)+'.xml')
    root = tree.getroot()
+   no_of_symmq=int(root.find('IRREPS_INFO/QPOINT_GROUP_RANK').text)
+   if no_of_symmq!=len(self.SYMMQ[q])-1:
+    print 'read patters: no of symmetry different then found in check_symm_of_q: '+str(no_of_symmq)+'!='+str(len(self.SYMMQ[q])-1)
+   if 'T' in root.find('IRREPS_INFO/MINUS_Q_SYM').text:
+    self.MINUS_Q_SYM.append(1)
+   else: 
+    self.MINUS_Q_SYM.append(0)
    for i in range(len(self.NONDEG[q])):
-     self.PATT[-1].append([])
+   #  self.PATT[-1].append([])
      rep=root.find('IRREPS_INFO/REPRESENTION.'+str(i+1))
      npert=int(rep.find('NUMBER_OF_PERTURBATIONS').text)
      for j in range(npert):
       pat=[ (lambda m: complex(float(m[0]),float(m[1])))(n.replace(',',' ').split()) for n in  rep.find('PERTURBATION.'+str(j+1)+'/DISPLACEMENT_PATTERN').text.split('\n')[1:-1]]
-      self.PATT[-1][-1].append(pat)
-      
+      self.PATT[-1].append(pat)
+
      
