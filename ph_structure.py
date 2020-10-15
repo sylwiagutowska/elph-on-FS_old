@@ -103,11 +103,10 @@ class ph_structure():
    tree = ET.parse(self.elph_dir+'/patterns.'+str(q+1)+'.xml')
    root = tree.getroot()
    for i in range(len(self.NONDEG[q])):
-     self.PATT[-1].append([])
      rep=root.find('IRREPS_INFO/REPRESENTION.'+str(i+1))
      npert=int(rep.find('NUMBER_OF_PERTURBATIONS').text)
      for j in range(npert):
       pat=[ (lambda m: complex(float(m[0]),float(m[1])))(n.replace(',',' ').split()) for n in  rep.find('PERTURBATION.'+str(j+1)+'/DISPLACEMENT_PATTERN').text.split('\n')[1:-1]]
-      self.PATT[-1][-1].append(pat)
+      self.PATT[-1].append(pat)
       
      
