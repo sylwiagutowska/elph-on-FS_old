@@ -3,6 +3,7 @@ PRECIS=6
 import xml.etree.ElementTree as ET
 import numpy as np
 from operator import itemgetter
+import glob
 
 class structure():
  def __init__(self):
@@ -13,9 +14,11 @@ class structure():
   self.e=[]
   self.SYMM=[]
   self.no_of_kpoints=[]
+  self.prefix=''
 
  def read_structure(self):
-  tree = ET.parse('FS/tmp_dir/ir.xml')
+  self.prefix=glob.glob('tmp_dir/*.xml')[0].replace('/','.').split('.')[-2]
+  tree = ET.parse('tmp_dir/'+self.prefix+'.xml')
   root = tree.getroot()
 
   for i in root.findall('output/band_structure/starting_k_points/monkhorst_pack'):

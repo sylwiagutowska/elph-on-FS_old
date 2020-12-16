@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 PRECIS=6
 class ph_structure():
- def __init__(self):
+ def __init__(self,structure):
   self.FREQ=[] #[i][j] i: q-point; j-nbnd
   self.NONDEG=[]
   self.DEG=[] #DEG[q][nbnd] = no of band, with whom the nbnd is degenerated
@@ -9,9 +9,11 @@ class ph_structure():
   self.Q=[]
   self.no_of_modes=0
   self.DYN=[]
-  self.SYMMQ=[]
+  self.multiplicity_of_qs=[]
+#  self.SYMMQ=[]
   self.PATT=[]
-  self.elph_dir='tmp_dir/_ph0/ir.phsave/'
+  self.prefix=structure.prefix
+  self.elph_dir='tmp_dir/_ph0/'+self.prefix+'.phsave/'  
 
  def read_dyn_of_q(self,tmp):
   for ni,i in enumerate(tmp):
@@ -59,21 +61,33 @@ class ph_structure():
      self.NONDEG[-1].append(f[j])
      self.DEG[-1][j]=len(self.NONDEG[-1])-1
 
+ def read_multiplicity_of_q(self,dynfile):
+  multiplicity=0
+  for i in dynfile:
+   if 'Dynamical  Matrix in cartesian axes' in i:
+    multiplicity=multiplicity+1
+  self.multiplicity_of_qs.append( multiplicity)
+
  def read_ph_structure(self):
   ###read frequencies and make DEG[q][nbnd] = no of band, with whom the nbnd is degenerated
-  h=open('ir.dyn1')
+  h=open(self.prefix+'.dyn1')
   for i in range(3): tmp=h.readline()
   h.close()
   self.nat=int(tmp.split()[1])
-  for file in range(1,30):
-   h=open('ir.dyn'+str(file))
+  for file in range(1,100):
+   try: h=open(self.prefix+'.dyn'+str(file))
+   except: break
    tmp=h.readlines()
    h.close()
    self.read_freq_of_q(tmp)
    self.read_dyn_of_q(tmp)
    self.read_q(tmp)
+   self.read_multiplicity_of_q(tmp)
   self.check_degeneration_of_modes()
 
+
+
+ '''
  def check_symm_of_q(self,structure):
   self.SYMMQ=[ ]
   self.pm=[0,1,-1]
@@ -94,8 +108,8 @@ class ph_structure():
      if found==1: 
       self.SYMMQ[-1].append(sym)
       break
-  for i in self.SYMMQ: print len(i)
-       
+#  for i in self.SYMMQ: print len(i)
+ '''       
 
  def read_patterns(self):
   for q in range(len(self.Q)):
@@ -108,5 +122,5 @@ class ph_structure():
      for j in range(npert):
       pat=[ (lambda m: complex(float(m[0]),float(m[1])))(n.replace(',',' ').split()) for n in  rep.find('PERTURBATION.'+str(j+1)+'/DISPLACEMENT_PATTERN').text.split('\n')[1:-1]]
       self.PATT[-1].append(pat)
-      
+
      

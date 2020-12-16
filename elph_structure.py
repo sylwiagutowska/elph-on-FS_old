@@ -3,13 +3,16 @@ import numpy as np
 import structure
 PRECIS=6
 class elph_structure():
- def __init__(self):
+ def __init__(self,ph_structure):
   self.ELPH_sum=[]
-  self.elph_dir='tmp_dir/_ph0/ir.phsave/'
+  self.elph_dir=ph_structure.elph_dir
+  self.prefix=ph_structure.prefix
   self.KPOINTS=[]
   self.nbnd_el=0
   self.nkp=0
   self.KPOINTS_all=[]
+  self.ALL_COLORS=[] 
+  self.lambda_or_elph='' #'lambda' or 'elph'
 
  def make_kpoints_single_q(self,file,basic_structure):
   self.pm=[0,-1,1]
@@ -45,13 +48,6 @@ class elph_structure():
  # structure_new.check_symm()
   structure_new.make_kgrid()
   self.KPOINTS_all=structure_new.allk
-  
-
- def transform_matrix_to_crystal(self,mat,at):
-  return [[ sum([ sum([ mat[k][l]*at[k][i]*at[l][j] for l in range(3)]) for k in range(3)]) for j in range(3)] for i in range(3)]
-
- def transform_matrix_to_cartesian(self,mat,e):
-  return [[ sum([ sum([ mat[k][l]*e[i][k]*e[j][l] for l in range(3)]) for k in range(3)]) for j in range(3)] for i in range(3)]
 
  def w0gauss(self,x):
   degauss=0.02
@@ -60,21 +56,26 @@ class elph_structure():
   arg = min (200., (x - 1.0 /  (2.0)**0.5 ) **2.)
   return sqrtpm1 * np.exp ( - arg) * (2.0 - ( 2.0)**0.5 * x)/0.02
 
- '''
- def symmetrize(self,ph_structure):
-  
-  for na in range(ph_structure.nat):
-   for nb in range(ph_structure.nat):
-     for ipol in range(3):
-       for ipol in range(3):
-              self.ELPH_sum(ipol, jpol, na, nb) = 0.5d0 * (phi (ipol, jpol, na, nb) &
-                   + CONJG(phi (jpol, ipol, nb, na) ) )
-              phi (jpol, ipol, nb, na) = CONJG(phi (ipol, jpol, na, nb) )
-           enddo
-        enddo
-     enddo
-  enddo  
- '''
+ 
+
+ def elph_matrix_to_gep(self,nat,dyn,el_ph_mat,w2,pat):
+  gep=[[ [[complex(0,0) for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
+  for ik in range(self.nkp):
+     for ib in range(self.nbnd_el):
+      for jb in range(self.nbnd_el):
+        for ii in range(3*nat):
+          gep[jb][ib][ik][ii] = np.dot(pat[ii], el_ph_mat[jb][ib][ik])
+        gep[jb][ib][ik] = np.matmul(gep[jb][ib][ik], dyn)
+  for ii in range(3*nat):
+   for ib in range(self.nbnd_el):
+    for jb in range(self.nbnd_el):
+     if w2[ii]<=0.:
+        gep[jb][ib][ik][ii]=0.
+     else:
+        gep[jb][ib][ik][ii]=gep[jb][ib][ik][ii]/((w2[ii]**0.5) * 2.)*0.5
+  return gep
+
+
 
  def read_elph_single_q(self,file,ph_structure,el_structure): #read info from first file
   tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.1.xml')
@@ -102,32 +103,40 @@ class elph_structure():
         for iipert in range(npert):
          ELPH[jband][iband][k-1].append\
           (elph_k[jband*self.nbnd_el*npert+iband*npert+iipert])
+     
+  ELPH=self.elph_matrix_to_gep(ph_structure.nat,\
+       ph_structure.DYN[file-1],ELPH,ph_structure.FREQ[file-1],\
+       ph_structure.PATT[file-1])
 
   for jband in range(self.nbnd_el):
     for k in range(1,self.nkp+1):
-       self.ELPH_sum[jband][k-1]=[[complex(0,0) for i in range(ph_structure.no_of_modes)] for j in range(ph_structure.no_of_modes)]
+       self.ELPH_sum[jband][k-1]=[complex(0,0) for i in range(ph_structure.no_of_modes)]
        for iipert in range(ph_structure.no_of_modes):
-        for jjpert in range(ph_structure.no_of_modes):
          for iband in range(self.nbnd_el):
-           self.ELPH_sum[jband][k-1][iipert][jjpert]+=\
-                self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[k-1][4]])*\
-                ELPH[jband][iband][k-1][iipert].conjugate()*\
-                ELPH[jband][iband][k-1][jjpert]
+           self.ELPH_sum[jband][k-1][iipert]+=\
+                self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[k-1][4]])*ELPH[jband][iband][k-1][iipert]
 
-
-
- def elph_single_q_in_whole_kgrid(self,q,structure,ph_structure,el_structure):
+ def elph_single_q_in_whole_kgrid(self,q,structure,ph_structure,el_structure,l_or_gep):
+  self.lambda_or_elph=l_or_gep
  #choose only bands which cross EF and sum over j in pairs <i,j>
   print('From all '+str(self.nbnd_el)+' bands detected in elph calc. only bands ',el_structure.bands_num,' cross EF and will be written in frmsf')
   COLORS=[ [] for jband in el_structure.bands_num]
-  for numk,k in enumerate(self.KPOINTS):
-   for numjband,jband in enumerate(el_structure.bands_num): 
-    COLORS[numjband].append( sum([elph.real**2+elph.imag**2 for elph in self.ELPH_sum[jband][numk]])   )
+  if self.lambda_or_elph=='elph':
+   for numk,k in enumerate(self.KPOINTS):
+    for numjband,jband in enumerate(el_structure.bands_num): 
+     COLORS[numjband].append( sum([elph.real**2+elph.imag**2 for elph in self.ELPH_sum[jband][numk]])   )
+  else:
+   for numk,k in enumerate(self.KPOINTS):
+    for numjband,jband in enumerate(el_structure.bands_num): 
+     COLORS[numjband].append( sum([(elph.real**2+elph.imag**2)/ph_structure.FREQ[q-1][num] for num,elph in enumerate(self.ELPH_sum[jband][numk])])   )
   
   print len(COLORS),[len(i) for i in COLORS]
   print len(el_structure.ENE_fs),[len(i) for i in el_structure.ENE_fs]
   print len(structure.allk)
-  h=open('elph'+str(q)+'.frmsf','w')
+  if self.lambda_or_elph=='elph':
+   h=open('elph'+str(q)+'.frmsf','w')
+  else:
+   h=open('lambda'+str(q)+'.frmsf','w')
   h.write(str(structure.no_of_kpoints[0])+' '+str(structure.no_of_kpoints[1])+' ' +str(structure.no_of_kpoints[2])+'\n')
   h.write('1\n'+str(len(el_structure.bands_num))+'\n')
   for i in structure.e:
@@ -141,5 +150,30 @@ class elph_structure():
    for k in self.KPOINTS_all:
     h.write(str(bnd[k[3]])+'\n')
   h.close()
+  self.ALL_COLORS.append(COLORS)
 
+
+ def sum_over_q(self,ph_structure,structure,el_structure):
+  SUMMED_COLORS=[[0 for k in range(len(jband))] for jband in range(len(self.ALL_COLORS[0]))]
+  for i in range(len(SUMMED_COLORS)):
+   for j in range(len(SUMMED_COLORS[i])):
+    for numk,k in enumerate(ALL_COLORS):
+     SUMMED_COLORS[i][j]+=k[i][j]*ph_structure.multiplicity_of_qs[numk]
+  if self.lambda_or_elph=='elph':
+   h=open('elph.frmsf','w')
+  else:
+   h=open('lambda.frmsf','w')
+  h.write(str(structure.no_of_kpoints[0])+' '+str(structure.no_of_kpoints[1])+' ' +str(structure.no_of_kpoints[2])+'\n')
+  h.write('1\n'+str(len(el_structure.bands_num))+'\n')
+  for i in structure.e:
+   for j in i:
+    h.write(str(j)+' ')
+   h.write('\n')
+  for bnd in el_structure.ENE_fs:
+   for k in structure.allk:
+    h.write(str(bnd[k[3]])+'\n')
+  for bnd in SUMMED_COLORS:
+   for k in self.KPOINTS_all:
+    h.write(str(bnd[k[3]])+'\n')
+  h.close()
 

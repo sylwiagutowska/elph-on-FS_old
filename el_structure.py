@@ -2,15 +2,17 @@ import xml.etree.ElementTree as ET
 Ha_to_ev=13.605662285137*2
 
 class el_structure():
- def __init__(self):
+ def __init__(self,structure):
   self.ENE_fs=[]
   self.ENE=[]
   self.ef=0.
   self.bands_num=[]
   self.minband=0
   self.maxband=0
+  self.prefix=structure.prefix
+
  def read_el_structure(self):
-  tree = ET.parse('FS/tmp_dir/ir.xml')
+  tree = ET.parse('tmp_dir/'+self.prefix+'.xml')
   root = tree.getroot()
 
   for i in root.findall('output/band_structure/fermi_energy'):
