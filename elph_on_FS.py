@@ -31,6 +31,7 @@ for q in range(1,len(ph_structure.Q)+1):
  elph_structure.read_elph_single_q(q,ph_structure,el_structure)
  elph_structure.elph_single_q_in_whole_kgrid(q,structure,\
                 ph_structure,el_structure,'lambda')  #'lambda' or 'elph'
+elph_structure.sum_over_q(ph_structure,structure,el_structure)
 
 ###
 

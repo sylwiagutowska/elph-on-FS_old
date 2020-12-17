@@ -11,6 +11,7 @@ class elph_structure():
   self.nbnd_el=0
   self.nkp=0
   self.KPOINTS_all=[]
+  self.KPOINTS_all_all_q=[]
   self.ALL_COLORS=[] 
   self.lambda_or_elph='' #'lambda' or 'elph'
 
@@ -48,6 +49,7 @@ class elph_structure():
  # structure_new.check_symm()
   structure_new.make_kgrid()
   self.KPOINTS_all=structure_new.allk
+  self.KPOINTS_all_all_q.append(structure_new.allk)
 
  def w0gauss(self,x):
   degauss=0.02
@@ -60,19 +62,22 @@ class elph_structure():
 
  def elph_matrix_to_gep(self,nat,dyn,el_ph_mat,w2,pat):
   gep=[[ [[complex(0,0) for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
+  '''
   for ik in range(self.nkp):
      for ib in range(self.nbnd_el):
       for jb in range(self.nbnd_el):
         for ii in range(3*nat):
           gep[jb][ib][ik][ii] = np.dot(pat[ii], el_ph_mat[jb][ib][ik])
         gep[jb][ib][ik] = np.matmul(gep[jb][ib][ik], dyn)
-  for ii in range(3*nat):
-   for ib in range(self.nbnd_el):
-    for jb in range(self.nbnd_el):
-     if w2[ii]<=0.:
+  '''
+  for ik in range(self.nkp):
+   for ii in range(3*nat):
+    for ib in range(self.nbnd_el):
+     for jb in range(self.nbnd_el):
+      if w2[ii]<=0.:
         gep[jb][ib][ik][ii]=0.
-     else:
-        gep[jb][ib][ik][ii]=gep[jb][ib][ik][ii]/((w2[ii]**0.5) * 2.)*0.5
+      else:
+        gep[jb][ib][ik][ii]=el_ph_mat[jb][ib][ik][ii]/((w2[ii]**0.5) * 2.)*0.5
   return gep
 
 
@@ -154,11 +159,12 @@ class elph_structure():
 
 
  def sum_over_q(self,ph_structure,structure,el_structure):
-  SUMMED_COLORS=[[0 for k in range(len(jband))] for jband in range(len(self.ALL_COLORS[0]))]
-  for i in range(len(SUMMED_COLORS)):
-   for j in range(len(SUMMED_COLORS[i])):
-    for numk,k in enumerate(ALL_COLORS):
-     SUMMED_COLORS[i][j]+=k[i][j]*ph_structure.multiplicity_of_qs[numk]
+  print('summing over q...')
+  SUMMED_COLORS=[[0 for k in range(len(self.KPOINTS_all))] for jband in self.ALL_COLORS[0]]
+  for band in range(len(SUMMED_COLORS)):
+   for numq,col_q in enumerate(self.ALL_COLORS):
+    for numk,k in enumerate(self.KPOINTS_all_all_q[numq]):
+     SUMMED_COLORS[band][numk]+=col_q[band][k[3]]*ph_structure.multiplicity_of_qs[numq]
   if self.lambda_or_elph=='elph':
    h=open('elph.frmsf','w')
   else:
@@ -173,7 +179,7 @@ class elph_structure():
    for k in structure.allk:
     h.write(str(bnd[k[3]])+'\n')
   for bnd in SUMMED_COLORS:
-   for k in self.KPOINTS_all:
-    h.write(str(bnd[k[3]])+'\n')
+   for k in bnd:
+    h.write(str(k)+'\n')
   h.close()
 
