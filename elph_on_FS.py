@@ -25,7 +25,7 @@ ph_structure.read_patterns()
 
 elph_structure=elph_structure.elph_structure(ph_structure)
 print ph_structure.Q
-for q in range(1,len(ph_structure.Q)+1):
+for q in range(1,3):
  print('calculations for '+str(q)+'. of total '+str(len(ph_structure.Q))+' q points')
  elph_structure.make_kpoints_single_q(q,structure)
  elph_structure.read_elph_single_q(q,ph_structure,el_structure)

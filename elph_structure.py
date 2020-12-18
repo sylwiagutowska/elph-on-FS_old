@@ -8,6 +8,7 @@ class elph_structure():
   self.elph_dir=ph_structure.elph_dir
   self.prefix=ph_structure.prefix
   self.KPOINTS=[]
+  self.WEIGHTS_OF_K=[]
   self.nbnd_el=0
   self.nkp=0
   self.KPOINTS_all=[]
@@ -49,7 +50,9 @@ class elph_structure():
  # structure_new.check_symm()
   structure_new.make_kgrid()
   self.KPOINTS_all=structure_new.allk
+  self.WEIGHTS_OF_K=structure_new.WK
   self.KPOINTS_all_all_q.append(structure_new.allk)
+
 
  def w0gauss(self,x):
   degauss=0.02
@@ -62,6 +65,7 @@ class elph_structure():
 
  def elph_matrix_to_gep(self,nat,dyn,el_ph_mat,w2,pat):
   gep=[[ [[complex(0,0) for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
+  gep2=[[ [[[complex(0,0) for jj in range(3*nat)] for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
   '''
   for ik in range(self.nkp):
      for ib in range(self.nbnd_el):
@@ -70,6 +74,17 @@ class elph_structure():
           gep[jb][ib][ik][ii] = np.dot(pat[ii], el_ph_mat[jb][ib][ik])
         gep[jb][ib][ik] = np.matmul(gep[jb][ib][ik], dyn)
   '''
+  for ik in range(self.nkp):
+     for ib in range(self.nbnd_el):
+      for jb in range(self.nbnd_el):
+        for ii in range(3*nat):
+         for jj in range(3*nat):
+          gep2[jb][ib][ik][ii][jj] = np.conjugate(el_ph_mat[jb][ib][ik][ii])*el_ph_mat[jb][ib][ik][jj]
+        for nu in range(3*nat):
+         for mu in range(3*nat):
+          for vu in range(3*nat):
+           gep[jb][ib][ik][nu] += np.conjugate(dyn[mu][nu])*gep2[jb][ib][ik][mu][vu]*dyn[vu][nu]
+
   for ik in range(self.nkp):
    for ii in range(3*nat):
     for ib in range(self.nbnd_el):
@@ -119,7 +134,7 @@ class elph_structure():
        for iipert in range(ph_structure.no_of_modes):
          for iband in range(self.nbnd_el):
            self.ELPH_sum[jband][k-1][iipert]+=\
-                self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[k-1][4]])*ELPH[jband][iband][k-1][iipert]
+                self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[k-1][4]])*ELPH[jband][iband][k-1][iipert]*self.WEIGHTS_OF_K[k-1]
 
  def elph_single_q_in_whole_kgrid(self,q,structure,ph_structure,el_structure,l_or_gep):
   self.lambda_or_elph=l_or_gep

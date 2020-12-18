@@ -9,6 +9,7 @@ class structure():
  def __init__(self):
   self.allk=[]
   self.NONEQ=[]
+  self.WK=[] #weights of kpoints
   self.pm=[0,1,-1]
   self.at=[]
   self.e=[]
@@ -126,6 +127,13 @@ class structure():
   print(len(SYMM2))
   self.SYMM=SYMM2
  '''
+ def calc_weight_of_k(self):
+  WK=[0 for i in range(len(self.NONEQ))]
+  for i in range(len(self.NONEQ)):
+   for j in self.allk:
+    if j[3]==i:
+     WK[i]+=1
+  return WK
 
  def make_kgrid(self):
   allk2=[]
@@ -156,8 +164,11 @@ class structure():
   allk_in_crystal_coordinates=self.sorting(allk_in_crystal_coordinates)
   self.allk=[ self.allk[i[3]] for i in allk_in_crystal_coordinates if i[0]<self.no_of_kpoints[0]  and i[1]<self.no_of_kpoints[1] and i[2]<self.no_of_kpoints[2]]
 
-  print(len(self.allk))
+  #calc weights of k
+  self.WK=self.calc_weight_of_k()
 
+  print(len(self.allk))
+  '''
   h=open('kpoints.dat','w')
   for i in self.allk:
    for j in i:
@@ -178,3 +189,4 @@ class structure():
     h.write(str(j)+' ')
    h.write('\n')
   h.close()
+  '''
