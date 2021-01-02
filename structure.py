@@ -18,6 +18,7 @@ class structure():
   self.prefix=''
 
  def read_structure(self):
+  print(' read structure...')
   self.prefix=glob.glob('tmp_dir/*.xml')[0].replace('/','.').split('.')[-2]
   tree = ET.parse('tmp_dir/'+self.prefix+'.xml')
   root = tree.getroot()
@@ -90,7 +91,7 @@ class structure():
    for j in i:
     allk.append(j)
   
-  print ' Sorting - Done!'
+#  print ' Sorting - Done!'
   return allk
 
  def remove_repeated_items(self,allk2):
@@ -136,6 +137,7 @@ class structure():
   return WK
 
  def make_kgrid(self):
+  print(' make whole kgrid')
   allk2=[]
   einv=np.linalg.inv(np.transpose(self.e))
   for nq in self.NONEQ:
@@ -190,3 +192,40 @@ class structure():
    h.write('\n')
   h.close()
   '''
+
+ def find_k_plus_q(self,k,allk,q):
+  einv=np.linalg.inv(np.transpose(self.e))
+  kpq=[k[i]+q[i] for i in range(3)]
+  found=0
+  for sym in self.SYMM:
+     x=[sum([sym[m1][m2]*kpq[m2] for m2 in range(3)]) for m1 in range(3)]
+     if found==1: break
+     for h1 in self.pm:
+      if found==1: break
+      for k1 in self.pm:
+       if found==1: break
+       for l1 in self.pm:
+        if found==1: break
+        k_point2=[round(kk,PRECIS) for kk in 
+                  (x-(h1*self.e[0]+k1*self.e[1]+l1*self.e[2]))]
+        k_point3=[round(self.no_of_kpoints[m2]*\
+                 round(sum([k_point2[m]*einv[m2][m] for m in range(3)]),PRECIS)\
+                     ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
+        if k_point3[0]>=0 and k_point3[0]<=self.no_of_kpoints[0] and \
+          k_point3[1]>=0 and k_point3[1]<=self.no_of_kpoints[1] and \
+          k_point3[2]>=0 and k_point3[2]<=self.no_of_kpoints[2]:
+          kpq2=k_point2
+          for ki in allk:
+           if found==1: break
+           if abs(round(kpq2[0]-ki[0],PRECIS-3))==0 and abs(round(kpq2[1]-ki[1],PRECIS-3))==0 and abs(round(kpq2[2]-ki[2],PRECIS-3))==0:
+            kpq_no=ki[3]
+            found=1
+            break
+
+
+#  for i in allk:
+#   if abs(round(kpq[0]-i[0],PRECIS-3))==0 and abs(round(kpq[1]-i[1],PRECIS-3))==0 and abs(round(kpq[2]-i[2],PRECIS-3))==0:
+#    kpq_no=i[3]
+#    break
+  return [kpq,kpq_no]
+

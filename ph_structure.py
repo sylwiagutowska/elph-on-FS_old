@@ -70,6 +70,7 @@ class ph_structure():
 
  def read_ph_structure(self):
   ###read frequencies and make DEG[q][nbnd] = no of band, with whom the nbnd is degenerated
+  print(' read phonon structure')
   h=open(self.prefix+'.dyn1')
   for i in range(3): tmp=h.readline()
   h.close()

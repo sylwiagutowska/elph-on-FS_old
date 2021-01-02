@@ -10,13 +10,15 @@ class elph_structure():
   self.KPOINTS=[]
   self.WEIGHTS_OF_K=[]
   self.nbnd_el=0
+  self.fermi_nbnd_el=0
   self.nkp=0
-  self.KPOINTS_all=[]
+  self.KPOINTS_all=[] #list of k and its no in list of nonequivalent kpoints
   self.KPOINTS_all_all_q=[]
+  self.KPQ=[] #k+q and its no in list of nonequivalent kpoints
   self.ALL_COLORS=[] 
   self.lambda_or_elph='' #'lambda' or 'elph'
 
- def make_kpoints_single_q(self,file,basic_structure):
+ def make_kpoints_single_q(self,file,basic_structure,q):
   self.pm=[0,-1,1]
   tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.1.xml')
   root = tree.getroot()
@@ -52,7 +54,10 @@ class elph_structure():
   self.KPOINTS_all=structure_new.allk
   self.WEIGHTS_OF_K=structure_new.WK
   self.KPOINTS_all_all_q.append(structure_new.allk)
-
+  self.KPQ=[]
+  print('adsfsf')
+  for k in self.KPOINTS:
+   self.KPQ.append(structure_new.find_k_plus_q(k, self.KPOINTS_all,q))
 
  def w0gauss(self,x):
   degauss=0.02
@@ -64,31 +69,35 @@ class elph_structure():
  
 
  def elph_matrix_to_gep(self,nat,dyn,el_ph_mat,w2,pat):
-  gep=[[ [[complex(0,0) for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
-  gep2=[[ [[[complex(0,0) for jj in range(3*nat)] for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
-  '''
+#  gep=[[ [[complex(0,0) for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
+#  gep2=[[ [[[complex(0,0) for jj in range(3*nat)] for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
+  gep=np.zeros(shape=(self.fermi_nbnd_el,self.nbnd_el,self.nkp,3*nat),dtype=complex)
+  gep2=np.zeros(shape=(self.fermi_nbnd_el,self.nbnd_el,self.nkp,3*nat,3*nat),dtype=complex)
+
+  '''DOES NOT CHANGE RESULTS
   for ik in range(self.nkp):
      for ib in range(self.nbnd_el):
-      for jb in range(self.nbnd_el):
+      for jb in range(self.fermi_nbnd_el):
         for ii in range(3*nat):
           gep[jb][ib][ik][ii] = np.dot(pat[ii], el_ph_mat[jb][ib][ik])
         gep[jb][ib][ik] = np.matmul(gep[jb][ib][ik], dyn)
   '''
+
   for ik in range(self.nkp):
      for ib in range(self.nbnd_el):
-      for jb in range(self.nbnd_el):
+      for jb in range(self.fermi_nbnd_el):
         for ii in range(3*nat):
          for jj in range(3*nat):
           gep2[jb][ib][ik][ii][jj] = np.conjugate(el_ph_mat[jb][ib][ik][ii])*el_ph_mat[jb][ib][ik][jj]
         for nu in range(3*nat):
          for mu in range(3*nat):
           for vu in range(3*nat):
-           gep[jb][ib][ik][nu] += np.conjugate(dyn[mu][nu])*gep2[jb][ib][ik][mu][vu]*dyn[vu][nu]
+           gep[jb][ib][ik][nu] += np.conjugate(dyn[mu][nu])*(gep2[jb][ib][ik][mu][vu]*dyn[vu][nu])
 
   for ik in range(self.nkp):
    for ii in range(3*nat):
     for ib in range(self.nbnd_el):
-     for jb in range(self.nbnd_el):
+     for jb in range(self.fermi_nbnd_el):
       if w2[ii]<=0.:
         gep[jb][ib][ik][ii]=0.
       else:
@@ -97,58 +106,72 @@ class elph_structure():
 
 
 
- def read_elph_single_q(self,file,ph_structure,el_structure): #read info from first file
-  tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.1.xml')
+ def read_elph_single_q(self,q_point_no,ph_structure,el_structure): 
+  print(' read elph from file...')
+  #read info from first file
+  tree = ET.parse(self.elph_dir+'elph.'+str(q_point_no)+'.1.xml')
   root = tree.getroot()
   self.nbnd_el=int(root.find('PARTIAL_EL_PHON/NUMBER_OF_BANDS').text)
-  ELPH=[[[ [] for k in range(self.nkp)] for j in range(self.nbnd_el)] for i in range(self.nbnd_el)] #stores elph[k][ibnd][jbnd][nmode]
-  self.ELPH_sum=[[ [] for k in range(self.nkp)] for j in range(self.nbnd_el) ]
+  #choose only bands which cross EF and sum over j in pairs <i,j>
+  print('From all '+str(self.nbnd_el)+' bands detected in elph calc. only bands ',el_structure.bands_num,' cross EF and will be written in frmsf')
+  self.fermi_nbnd_el=len(el_structure.bands_num)
+#  ELPH=[[[ [] for k in range(self.nkp)] for j in range(self.nbnd_el)] for i in range(self.fermi_nbnd_el)] #stores elph[k][ibnd][jbnd][nmode]
+  ELPH=np.zeros(shape=(self.fermi_nbnd_el,self.nbnd_el,self.nkp,ph_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
+  self.ELPH_sum=np.zeros(shape=(self.fermi_nbnd_el,\
+                self.nkp,ph_structure.no_of_modes),dtype=complex)
 #stores elph[k][ibnd][nmode][mmode]
 
   #read elph  from all files
-  for mode in range(1,len(ph_structure.NONDEG[file-1])+1):
+  for mode in range(1,len(ph_structure.NONDEG[q_point_no-1])+1):
    #elph
-   tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.'+str(mode)+'.xml')
+   tree = ET.parse(self.elph_dir+'elph.'+str(q_point_no)+'.'+str(mode)+'.xml')
    root = tree.getroot()
    for country in root.iter('PARTIAL_EL_PHON'):
     for k in range(1,self.nkp+1):
      for town in country.iter('K_POINT.'+str(k)):
       partial_elph=town.find('PARTIAL_ELPH')
-      if k==1: npert=int(partial_elph.get('size'))/self.nbnd_el/self.nbnd_el
+      if k==1: 
+       npert=int(partial_elph.get('size'))/self.nbnd_el/self.nbnd_el
       elph_k=[ complex(float(m.replace(',',' ').split()[0]), 
                 float(m.replace(',',' ').split()[1])) 
                 for m in partial_elph.text.split('\n') if len(m.split())>0  ]
-      for jband in range(self.nbnd_el):
+      for numjband,jband in enumerate(el_structure.bands_num):
        for iband in range(self.nbnd_el):
         for iipert in range(npert):
-         ELPH[jband][iband][k-1].append\
+         ELPH[numjband][iband][k-1][iipert]=\
           (elph_k[jband*self.nbnd_el*npert+iband*npert+iipert])
      
   ELPH=self.elph_matrix_to_gep(ph_structure.nat,\
-       ph_structure.DYN[file-1],ELPH,ph_structure.FREQ[file-1],\
-       ph_structure.PATT[file-1])
+       ph_structure.DYN[q_point_no-1],ELPH,ph_structure.FREQ[q_point_no-1],\
+       ph_structure.PATT[q_point_no-1])
 
-  for jband in range(self.nbnd_el):
+  #sum over jband
+  for iband in range(self.fermi_nbnd_el):
     for k in range(1,self.nkp+1):
-       self.ELPH_sum[jband][k-1]=[complex(0,0) for i in range(ph_structure.no_of_modes)]
        for iipert in range(ph_structure.no_of_modes):
-         for iband in range(self.nbnd_el):
-           self.ELPH_sum[jband][k-1][iipert]+=\
-                self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[k-1][4]])*ELPH[jband][iband][k-1][iipert]*self.WEIGHTS_OF_K[k-1]
+         for jband in range(self.nbnd_el):
+ #          print k-1,self.KPQ[k-1],self.nkp,\
+ #                len(self.WEIGHTS_OF_K),len(el_structure.ENE[jband])
+           self.ELPH_sum[iband][k-1][iipert]+=\
+             self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[self.KPQ[k-1][1]][4]])\
+             *ELPH[iband][jband][k-1][iipert]\
+             *self.WEIGHTS_OF_K[self.KPQ[k-1][1]]
+
+
+
 
  def elph_single_q_in_whole_kgrid(self,q,structure,ph_structure,el_structure,l_or_gep):
+  print(' print elph to file')
   self.lambda_or_elph=l_or_gep
- #choose only bands which cross EF and sum over j in pairs <i,j>
-  print('From all '+str(self.nbnd_el)+' bands detected in elph calc. only bands ',el_structure.bands_num,' cross EF and will be written in frmsf')
-  COLORS=[ [] for jband in el_structure.bands_num]
+  COLORS=np.zeros(shape=(len(el_structure.bands_num), len(self.KPOINTS)))
   if self.lambda_or_elph=='elph':
    for numk,k in enumerate(self.KPOINTS):
-    for numjband,jband in enumerate(el_structure.bands_num): 
-     COLORS[numjband].append( sum([elph.real**2+elph.imag**2 for elph in self.ELPH_sum[jband][numk]])   )
+    for jband in range(len(el_structure.bands_num)): 
+     COLORS[jband][numk]= sum([elph.real**2+elph.imag**2 for elph in self.ELPH_sum[jband][numk]])   
   else:
    for numk,k in enumerate(self.KPOINTS):
-    for numjband,jband in enumerate(el_structure.bands_num): 
-     COLORS[numjband].append( sum([(elph.real**2+elph.imag**2)/ph_structure.FREQ[q-1][num] for num,elph in enumerate(self.ELPH_sum[jband][numk])])   )
+    for jband in range(len(el_structure.bands_num)): 
+     COLORS[jband][numk]= sum([(elph.real**2+elph.imag**2)/ph_structure.FREQ[q-1][num] for num,elph in enumerate(self.ELPH_sum[jband][numk])])
   
   print len(COLORS),[len(i) for i in COLORS]
   print len(el_structure.ENE_fs),[len(i) for i in el_structure.ENE_fs]

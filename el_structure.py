@@ -12,6 +12,7 @@ class el_structure():
   self.prefix=structure.prefix
 
  def read_el_structure(self):
+  print(' read electronic structure')
   tree = ET.parse('tmp_dir/'+self.prefix+'.xml')
   root = tree.getroot()
 
