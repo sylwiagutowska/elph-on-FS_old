@@ -10,10 +10,11 @@ class el_structure():
   self.minband=0
   self.maxband=0
   self.prefix=structure.prefix
+  self.tmp_dir=structure.tmp_dir
 
  def read_el_structure(self):
   print(' read electronic structure')
-  tree = ET.parse('tmp_dir/'+self.prefix+'.xml')
+  tree = ET.parse(self.tmp_dir+'/'+self.prefix+'.xml')
   root = tree.getroot()
 
   for i in root.findall('output/band_structure/fermi_energy'):

@@ -7,18 +7,19 @@ class elph_structure():
   self.ELPH_sum=[]
   self.elph_dir=ph_structure.elph_dir
   self.prefix=ph_structure.prefix
-  self.KPOINTS=[]
+  self.KPOINTS=[] #[0:2] list of noneq k at given q [3] its no in list of nonequivalent kpoints at given q  (self.KPOINTS)  and [4] its no in list of nonequivalent kpoints of electronic structure (el_structure.NONEQ)
   self.WEIGHTS_OF_K=[]
   self.nbnd_el=0
   self.fermi_nbnd_el=0
   self.nkp=0
-  self.KPOINTS_all=[] #list of k and its no in list of nonequivalent kpoints
+  self.KPOINTS_all=[] #[0:2] list of allk [3] its no in list of nonequivalent kpoints at given q  (self.KPOINTS)  
   self.KPOINTS_all_all_q=[]
-  self.KPQ=[] #k+q and its no in list of nonequivalent kpoints
+  self.KPQ=[] #[0] k+q, [1] its no in list of nonequivalent kpoints at given q  (self.KPOINTS)  
   self.ALL_COLORS=[] 
   self.lambda_or_elph='' #'lambda' or 'elph'
 
  def make_kpoints_single_q(self,file,basic_structure,q):
+  print('make kgrid at given q')
   self.pm=[0,-1,1]
   tree = ET.parse(self.elph_dir+'elph.'+str(file)+'.1.xml')
   root = tree.getroot()
@@ -55,9 +56,9 @@ class elph_structure():
   self.WEIGHTS_OF_K=structure_new.WK
   self.KPOINTS_all_all_q.append(structure_new.allk)
   self.KPQ=[]
-  print('adsfsf')
   for k in self.KPOINTS:
    self.KPQ.append(structure_new.find_k_plus_q(k, self.KPOINTS_all,q))
+
 
  def w0gauss(self,x):
   degauss=0.02
@@ -71,8 +72,8 @@ class elph_structure():
  def elph_matrix_to_gep(self,nat,dyn,el_ph_mat,w2,pat):
 #  gep=[[ [[complex(0,0) for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
 #  gep2=[[ [[[complex(0,0) for jj in range(3*nat)] for ii in range(3*nat)] for ik in range(self.nkp)] for ib in range(self.nbnd_el)] for jb in range(self.nbnd_el)]
-  gep=np.zeros(shape=(self.fermi_nbnd_el,self.nbnd_el,self.nkp,3*nat),dtype=complex)
-  gep2=np.zeros(shape=(self.fermi_nbnd_el,self.nbnd_el,self.nkp,3*nat,3*nat),dtype=complex)
+  gep=np.zeros(shape=(self.nbnd_el,self.fermi_nbnd_el,self.nkp,3*nat),dtype=complex)
+  gep2=np.zeros(shape=(self.nbnd_el,self.fermi_nbnd_el,self.nkp,3*nat,3*nat),dtype=complex)
 
   '''DOES NOT CHANGE RESULTS
   for ik in range(self.nkp):
@@ -84,8 +85,8 @@ class elph_structure():
   '''
 
   for ik in range(self.nkp):
-     for ib in range(self.nbnd_el):
-      for jb in range(self.fermi_nbnd_el):
+     for jb in range(self.nbnd_el):
+      for ib in range(self.fermi_nbnd_el):
         for ii in range(3*nat):
          for jj in range(3*nat):
           gep2[jb][ib][ik][ii][jj] = np.conjugate(el_ph_mat[jb][ib][ik][ii])*el_ph_mat[jb][ib][ik][jj]
@@ -96,12 +97,12 @@ class elph_structure():
 
   for ik in range(self.nkp):
    for ii in range(3*nat):
-    for ib in range(self.nbnd_el):
-     for jb in range(self.fermi_nbnd_el):
+    for jb in range(self.nbnd_el):
+     for ib in range(self.fermi_nbnd_el):
       if w2[ii]<=0.:
         gep[jb][ib][ik][ii]=0.
       else:
-        gep[jb][ib][ik][ii]=el_ph_mat[jb][ib][ik][ii]/((w2[ii]**0.5) * 2.)*0.5
+        gep[jb][ib][ik][ii]=gep[jb][ib][ik][ii]/((w2[ii]**0.5) * 2.)*0.5
   return gep
 
 
@@ -116,7 +117,7 @@ class elph_structure():
   print('From all '+str(self.nbnd_el)+' bands detected in elph calc. only bands ',el_structure.bands_num,' cross EF and will be written in frmsf')
   self.fermi_nbnd_el=len(el_structure.bands_num)
 #  ELPH=[[[ [] for k in range(self.nkp)] for j in range(self.nbnd_el)] for i in range(self.fermi_nbnd_el)] #stores elph[k][ibnd][jbnd][nmode]
-  ELPH=np.zeros(shape=(self.fermi_nbnd_el,self.nbnd_el,self.nkp,ph_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
+  ELPH=np.zeros(shape=(self.nbnd_el,self.fermi_nbnd_el,self.nkp,ph_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
   self.ELPH_sum=np.zeros(shape=(self.fermi_nbnd_el,\
                 self.nkp,ph_structure.no_of_modes),dtype=complex)
 #stores elph[k][ibnd][nmode][mmode]
@@ -133,13 +134,15 @@ class elph_structure():
       if k==1: 
        npert=int(partial_elph.get('size'))/self.nbnd_el/self.nbnd_el
       elph_k=[ complex(float(m.replace(',',' ').split()[0]), 
-                float(m.replace(',',' ').split()[1])) 
+                       float(m.replace(',',' ').split()[1])) 
                 for m in partial_elph.text.split('\n') if len(m.split())>0  ]
-      for numjband,jband in enumerate(el_structure.bands_num):
-       for iband in range(self.nbnd_el):
+      for jband in range(self.nbnd_el):
+       for numiband,iband in enumerate(el_structure.bands_num):
         for iipert in range(npert):
-         ELPH[numjband][iband][k-1][iipert]=\
-          (elph_k[jband*self.nbnd_el*npert+iband*npert+iipert])
+         ELPH[jband][numiband][k-1][iipert]=\
+          elph_k[iipert*self.nbnd_el*npert+jband*self.nbnd_el+iband]
+#          elph_k[iipert*self.nbnd_el*npert+iband*self.nbnd_el+jband] --rather wrong
+#          elph_k[jband*self.nbnd_el*npert+iband*npert+iipert] --wrong
      
   ELPH=self.elph_matrix_to_gep(ph_structure.nat,\
        ph_structure.DYN[q_point_no-1],ELPH,ph_structure.FREQ[q_point_no-1],\
@@ -154,7 +157,7 @@ class elph_structure():
  #                len(self.WEIGHTS_OF_K),len(el_structure.ENE[jband])
            self.ELPH_sum[iband][k-1][iipert]+=\
              self.w0gauss(el_structure.ef-el_structure.ENE[jband][self.KPOINTS[self.KPQ[k-1][1]][4]])\
-             *ELPH[iband][jband][k-1][iipert]\
+             *ELPH[jband][iband][k-1][iipert]\
              *self.WEIGHTS_OF_K[self.KPQ[k-1][1]]
 
 

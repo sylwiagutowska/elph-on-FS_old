@@ -16,11 +16,12 @@ class structure():
   self.SYMM=[]
   self.no_of_kpoints=[]
   self.prefix=''
+  self.tmp_dir='../tmp_dir'
 
  def read_structure(self):
   print(' read structure...')
-  self.prefix=glob.glob('tmp_dir/*.xml')[0].replace('/','.').split('.')[-2]
-  tree = ET.parse('tmp_dir/'+self.prefix+'.xml')
+  self.prefix=glob.glob(self.tmp_dir+'/*.xml')[0].replace('/','.').split('.')[-2]
+  tree = ET.parse(self.tmp_dir+'/'+self.prefix+'.xml')
   root = tree.getroot()
 
   for i in root.findall('output/band_structure/starting_k_points/monkhorst_pack'):
@@ -217,7 +218,7 @@ class structure():
           kpq2=k_point2
           for ki in allk:
            if found==1: break
-           if abs(round(kpq2[0]-ki[0],PRECIS-3))==0 and abs(round(kpq2[1]-ki[1],PRECIS-3))==0 and abs(round(kpq2[2]-ki[2],PRECIS-3))==0:
+           if abs(round(kpq2[0]-ki[0],PRECIS))==0 and abs(round(kpq2[1]-ki[1],PRECIS))==0 and abs(round(kpq2[2]-ki[2],PRECIS))==0:
             kpq_no=ki[3]
             found=1
             break

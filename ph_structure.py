@@ -13,7 +13,7 @@ class ph_structure():
 #  self.SYMMQ=[]
   self.PATT=[]
   self.prefix=structure.prefix
-  self.elph_dir='tmp_dir/_ph0/'+self.prefix+'.phsave/'  
+  self.elph_dir=structure.tmp_dir+'/_ph0/'+self.prefix+'.phsave/'  
 
  def read_dyn_of_q(self,tmp):
   for ni,i in enumerate(tmp):
