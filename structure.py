@@ -42,7 +42,7 @@ class structure():
    self.e.append([round(float(m),PRECIS) for m in i.find('b2').text.split()])
    self.e.append([round(float(m),PRECIS) for m in i.find('b3').text.split()])
   self.e=np.array(self.e)
-  print self.e
+  print (self.e)
 
   # lattice vectors
   for i in root.findall('output/atomic_structure/cell'):
@@ -50,7 +50,7 @@ class structure():
    self.at.append([round(float(m),PRECIS) for m in i.find('a2').text.split()])
    self.at.append([round(float(m),PRECIS) for m in i.find('a3').text.split()])
   self.at=np.array(self.at)
-  print self.at
+  print (self.at)
 
   #symmetry operations
   self.SYMM=[np.array([[1,0,0],[0,1,0],[0,0,1]])]
@@ -102,7 +102,7 @@ class structure():
     y=allk2[i+1]
     if not((x[0]==y[0]) and (x[1]==y[1]) and (x[2]==y[2])):
      allk.append(x)
-  print len(allk)
+  print (len(allk))
   return allk
  
  ''' doesnot work 
@@ -158,7 +158,7 @@ class structure():
          k_point3[2]>=0 and k_point3[2]<=self.no_of_kpoints[2]:
          allk2.append(k_point2)
          allk2[-1].append(nq[3])
-  print len(allk2)
+  print (len(allk2))
   allk2=self.sorting(allk2)
   self.allk=self.remove_repeated_items(allk2)
 
