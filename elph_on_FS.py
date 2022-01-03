@@ -6,26 +6,75 @@ import structure
 import el_structure
 import ph_structure
 import elph_structure
+import copy
+def round_complex(y):
+ prec=9
+ try:
+  for i in range(len(y)):
+   for j in range(len(y[i])):
+    y[i][j]=round(y[i][j].real,prec)+1j*round(y[i][j].imag,prec)
+ except:
+  try:
+   for i in range(len(y)):
+    y[i]=round(y[i].real,prec)+1j*round(y[i].imag,prec)
+  except:
+    y=round(y.real,prec)+1j*round(y.imag,prec)
+ return y
+
+sstructure=structure.structure()
+sstructure.read_structure()
+sstructure.make_kgrid()
 
 
-structure=structure.structure()
-structure.read_structure()
-structure.make_kgrid()
-
-
-el_structure=el_structure.el_structure(structure)
+el_structure=el_structure.el_structure(sstructure)
 el_structure.read_el_structure()
 
 
-ph_structure=ph_structure.ph_structure(structure)
-ph_structure.read_ph_structure()
+phh_structure=ph_structure.ph_structure(sstructure)
+phh_structure.read_ph_structure()
 #ph_structure.check_symm_of_q(structure)
-ph_structure.read_patterns()
+
+phh_structure.read_patterns()
+#print(phh_structure.PATT[1])
+basic_structure=sstructure
+
+
+ #check if composing dynmat works - WORKS! GIVES PROPER omega^2
+
+ELECTRONMASS_SI  = 9.10938215e-31   # Kg
+AMU_SI           = 1.660538782e-27  #Kg
+AMU_AU           = AMU_SI / ELECTRONMASS_SI
+AMU_RY           = AMU_AU / 2. #=911.44
+RY_TO_THZ=3289.8449
+pb_mass=207.2
 
 
 
-elph_structure=elph_structure.elph_structure(ph_structure,'lambda')
-print (ph_structure.Q)
+for qno in range(len(phh_structure.Q)):
+ structure_new=copy.deepcopy(sstructure)
+ structure_new.check_symm(phh_structure.Q[qno],sstructure.NONEQ)
+#print(len(structure_new.SYMM))
+# print(phh_structure.DYN2[qno],np.sum(phh_structure.DYN2[qno],axis=0))
+ dyn=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[qno]),
+phh_structure.DYN2[qno],
+sstructure.at,sstructure.e,
+ sstructure.SYMM_crystal, structure_new.SYMM_crystal)
+ dyn=dyn/pb_mass/AMU_RY
+# print(round_complex(dyn))
+ print('diagonalized')
+ phh_structure.DYN[qno]=[dyn]
+ a=np.linalg.eig(dyn)
+ phh_structure.FREQ[qno]=abs(a[0])**0.5*RY_TO_THZ
+ print( qno,phh_structure.DYN[qno], phh_structure.FREQ[qno])
+ #print(round_complex(a[0]*RY_TO_THZ*RY_TO_THZ))
+ #print(round_complex(a[1]))
+ #exit()
+
+
+elphh_structure=elph_structure.elph_structure(phh_structure,'lambda')
+print (phh_structure.Q)
+print(len(phh_structure.Q),len(phh_structure.DYN2),len(phh_structure.PATT))
+
 '''
 for q in range(1,len(ph_structure.Q)+1):
  print('calculations for '+str(q)+'. of total '+str(len(ph_structure.Q))+' q points')
@@ -35,7 +84,24 @@ for q in range(1,len(ph_structure.Q)+1):
                 ph_structure,el_structure,'lambda')  #'lambda' or 'elph'
 elph_structure.sum_over_q(ph_structure,structure,el_structure)
 '''
-elph_structure.parallel_job(structure,el_structure,ph_structure)
-elph_structure.sum_over_q(ph_structure,structure,el_structure)
+elphh_structure.parallel_job(sstructure,el_structure,phh_structure)
+#elph_structure.single_job([29,structure,ph_structure,el_structure,'lambda'])
+elphh_structure.sum_over_q(phh_structure,sstructure,el_structure)
+elphh_structure.extrapolate_values(sstructure,el_structure)
+
+'''
+h=open('lambda.frmsf')
+tmp=h.readlines()[6+len(el_structure.ENE_fs)*len(structure.allk):]
+h.close()
+m=0
+elph_structure.SUMMED_COLORS=[[ 0 for i in range(len(structure.allk))] for j in range(len(el_structure.ENE_fs))]
+
+for bnd in range(len(el_structure.ENE_fs)):
+ for k in range(len(structure.allk)):
+    elph_structure.SUMMED_COLORS[bnd][k]=float(tmp[m])
+    m+=1
+print(m)
+elph_structure.extrapolate_values(structure,el_structure)
+'''
 ###
 

@@ -53,12 +53,14 @@ class structure():
   print (self.at)
 
   #symmetry operations
-  self.SYMM=[np.array([[1,0,0],[0,1,0],[0,0,1]])]
+  self.SYMM_crystal=[]
+  self.SYMM=[]
   einv=np.linalg.inv(self.e)
   for neighbor in root.iter('rotation'):
      tmp=neighbor.text.split()
      tmp2=np.array([ [ float(m) for m in tmp[0:3]], [float(m) for m in tmp[3:6]], [float(m) for m in tmp[6:9]]])
      self.SYMM.append(np.transpose(np.dot(einv,(np.dot(tmp2,self.e)))))
+     self.SYMM_crystal.append(tmp2)
   print ('No of symm. op.='+str(len(self.SYMM)))
 
  def sorting(self,allk2):
@@ -102,7 +104,7 @@ class structure():
     y=allk2[i+1]
     if not((x[0]==y[0]) and (x[1]==y[1]) and (x[2]==y[2])):
      allk.append(x)
-  print (len(allk))
+  if not((allk[-1][0]==allk2[-1][0]) and (allk[-1][1]==allk2[-1][1]) and (allk[-1][2]==allk2[-1][2])): allk.append(allk2[-1])
   return allk
  
  ''' doesnot work 
@@ -137,7 +139,7 @@ class structure():
      WK[i]+=1
   return WK
 
- def make_kgrid(self):
+ def make_kgrid(self,q=-1):
   print(' make whole kgrid')
   allk2=[]
   einv=np.linalg.inv(np.transpose(self.e))
@@ -153,9 +155,9 @@ class structure():
        k_point3=[round(self.no_of_kpoints[m2]*\
                 round(sum([k_point2[m]*einv[m2][m] for m in range(3)]),PRECIS)\
                      ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
-       if k_point3[0]>=0 and k_point3[0]<=self.no_of_kpoints[0] and \
-         k_point3[1]>=0 and k_point3[1]<=self.no_of_kpoints[1] and \
-         k_point3[2]>=0 and k_point3[2]<=self.no_of_kpoints[2]:
+       if k_point3[0]>=0 and k_point3[0]<self.no_of_kpoints[0] and \
+         k_point3[1]>=0 and k_point3[1]<self.no_of_kpoints[1] and \
+         k_point3[2]>=0 and k_point3[2]<self.no_of_kpoints[2]:
          allk2.append(k_point2)
          allk2[-1].append(nq[3])
   print (len(allk2))
@@ -163,14 +165,16 @@ class structure():
   self.allk=self.remove_repeated_items(allk2)
 
   #rearrange
-  allk_in_crystal_coordinates=[ [ round(self.no_of_kpoints[0]*round(sum([v[m]*einv[m2][m] for m in range(3)]),PRECIS)) for m2 in range(3)]+[nv] for nv,v in enumerate(self.allk)]
+  allk_in_crystal_coordinates=[ [ round(self.no_of_kpoints[0]*round(sum([v[m]*einv[m2][m] for m in range(3)]),PRECIS)) for m2 in range(3)]+[v[3],nv] for nv,v in enumerate(self.allk)]
   allk_in_crystal_coordinates=self.sorting(allk_in_crystal_coordinates)
-  self.allk=[ self.allk[i[3]] for i in allk_in_crystal_coordinates if i[0]<self.no_of_kpoints[0]  and i[1]<self.no_of_kpoints[1] and i[2]<self.no_of_kpoints[2]]
+  self.allk=[ self.allk[i[4]] for i in allk_in_crystal_coordinates]
 
+  self.allk=[i[:4] for i in self.allk]
   #calc weights of k
   self.WK=self.calc_weight_of_k()
 
-  print(len(self.allk))
+  if len(self.allk)!=self.no_of_kpoints[0]*self.no_of_kpoints[0]*self.no_of_kpoints[0]: raise ValueError(q,'wrong no of kpoints',len(self.allk),'!=',self.no_of_kpoints[0]*self.no_of_kpoints[0]*self.no_of_kpoints[0])
+
   '''
   h=open('kpoints.dat','w')
   for i in self.allk:
@@ -194,9 +198,44 @@ class structure():
   h.close()
   '''
 
+ def check_symm(self,q,basic_kpoints):
+  print(' make whole kgrid')
+  allk2=[]
+  SYMM2_crystal=[]
+  SYMM2=[]
+  einv=np.linalg.inv(np.transpose(self.e))
+  k_pointp2=[round(self.no_of_kpoints[m2]*\
+                round(sum([q[m]*einv[m2][m] for m in range(3)]),PRECIS)\
+                     ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points  
+  for si,sym in enumerate(self.SYMM):
+     found=0
+     x=[sum([sym[m1][m2]*q[m2] for m2 in range(3)]) for m1 in range(3)]   
+     for h1 in self.pm:
+      for k1 in self.pm:
+       for l1 in self.pm:
+        k_point2=[round(kk,PRECIS) for kk in 
+                 (x-(h1*self.e[0]+k1*self.e[1]+l1*self.e[2]))]
+        k_point3=[round(self.no_of_kpoints[m2]*\
+                round(sum([k_point2[m]*einv[m2][m] for m in range(3)]),PRECIS)\
+                     ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
+        if k_point3[0]==k_pointp2[0] and  k_point3[1]==k_pointp2[1] and  k_point3[2]==k_pointp2[2]:
+           found=1
+           break
+       if found: break
+      if found: break
+     if found: 
+      SYMM2.append(sym)
+      SYMM2_crystal.append(self.SYMM_crystal[si])
+  self.SYMM=SYMM2
+  self.SYMM_crystal=SYMM2_crystal
+
  def find_k_plus_q(self,k,allk,q):
   einv=np.linalg.inv(np.transpose(self.e))
   kpq=[k[i]+q[i] for i in range(3)]
+  for i in range(3): 
+   if kpq[i]>=1: kpq[i]=kpq[i]-1
+  for i in range(3): 
+   if kpq[i]<=-1: kpq[i]=kpq[i]+1
   found=0
   for sym in self.SYMM:
      x=[sum([sym[m1][m2]*kpq[m2] for m2 in range(3)]) for m1 in range(3)]
@@ -212,14 +251,15 @@ class structure():
         k_point3=[round(self.no_of_kpoints[m2]*\
                  round(sum([k_point2[m]*einv[m2][m] for m in range(3)]),PRECIS)\
                      ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
-        if k_point3[0]>=0 and k_point3[0]<=self.no_of_kpoints[0] and \
-          k_point3[1]>=0 and k_point3[1]<=self.no_of_kpoints[1] and \
-          k_point3[2]>=0 and k_point3[2]<=self.no_of_kpoints[2]:
+        if k_point3[0]>=0 and k_point3[0]<self.no_of_kpoints[0] and \
+          k_point3[1]>=0 and k_point3[1]<self.no_of_kpoints[1] and \
+          k_point3[2]>=0 and k_point3[2]<self.no_of_kpoints[2]:
           kpq2=k_point2
           for ki in allk:
            if found==1: break
            if abs(round(kpq2[0]-ki[0],PRECIS))==0 and abs(round(kpq2[1]-ki[1],PRECIS))==0 and abs(round(kpq2[2]-ki[2],PRECIS))==0:
             kpq_no=ki[3]
+            kpq_no_in_basic=ki[4]
             found=1
             break
 
@@ -228,5 +268,12 @@ class structure():
 #   if abs(round(kpq[0]-i[0],PRECIS-3))==0 and abs(round(kpq[1]-i[1],PRECIS-3))==0 and abs(round(kpq[2]-i[2],PRECIS-3))==0:
 #    kpq_no=i[3]
 #    break
-  return [kpq,kpq_no]
+  return [kpq,kpq_no,kpq_no_in_basic]
+
+ def find_newkpoints_in_old_list(self,old_allk):
+  for i in self.NONEQ: i.append(None)
+  for nk,k in enumerate(self.allk):
+   k.append(old_allk[nk][3]) # k=kx,ky,kz,no_of_noneq_in_new_grid,no_of_noneq_in_basic_grid
+   self.NONEQ[k[3]][4]=old_allk[nk][3]
+
 

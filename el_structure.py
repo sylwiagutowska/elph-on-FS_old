@@ -7,6 +7,7 @@ class el_structure():
   self.ENE=[]
   self.ef=0.
   self.bands_num=[]
+  self.fermi_nbnd_el=0
   self.minband=0
   self.maxband=0
   self.prefix=structure.prefix
@@ -41,6 +42,7 @@ class el_structure():
    if below_ENE[i] and top_ENE[i]: 
     self.bands_num.append(i)
   self.minband,self.maxband=self.bands_num[0],self.bands_num[-1]
+  self.fermi_nbnd_el=len(self.bands_num)
 
   self.ENE=ENE2
   self.ENE_fs=ENE2[self.minband:self.maxband+1] #np.transpose(np.array(ENE2)) #ENE=[] #ENE[i][j] , i - no of band, j-no of kpoint
