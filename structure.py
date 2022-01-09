@@ -165,9 +165,9 @@ class structure():
   self.allk=self.remove_repeated_items(allk2)
 
   #rearrange
-  allk_in_crystal_coordinates=[ [ round(self.no_of_kpoints[0]*round(sum([v[m]*einv[m2][m] for m in range(3)]),PRECIS)) for m2 in range(3)]+[v[3],nv] for nv,v in enumerate(self.allk)]
-  allk_in_crystal_coordinates=self.sorting(allk_in_crystal_coordinates)
-  self.allk=[ self.allk[i[4]] for i in allk_in_crystal_coordinates]
+  self.allk_in_crystal_coordinates=[ [ round(self.no_of_kpoints[0]*round(sum([v[m]*einv[m2][m] for m in range(3)]),PRECIS)) for m2 in range(3)]+[v[3],nv] for nv,v in enumerate(self.allk)]
+  self.allk_in_crystal_coordinates=self.sorting(self.allk_in_crystal_coordinates)
+  self.allk=[ self.allk[i[4]] for i in self.allk_in_crystal_coordinates]
 
   self.allk=[i[:4] for i in self.allk]
   #calc weights of k
@@ -228,6 +228,52 @@ class structure():
       SYMM2_crystal.append(self.SYMM_crystal[si])
   self.SYMM=SYMM2
   self.SYMM_crystal=SYMM2_crystal
+
+
+
+
+ def calc_noneq(self,q=-1):
+  print(' make noneq kgrid')
+  NONEQ2=[]
+  einv=np.linalg.inv(np.transpose(self.e))
+
+  for k in self.allk:
+   found=0
+   k_point3=[round(self.no_of_kpoints[m2]*\
+             round(sum([k[m]*einv[m2][m] for m in range(3)]),PRECIS)\
+                     ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
+   print(k_point3)
+  # print nq
+   for nnq,nq in enumerate(NONEQ2):
+    for sym in self.SYMM:
+     x=[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
+     for h1 in self.pm:
+      for k1 in self.pm:
+       for l1 in self.pm:
+        q_point2=[round(kk,PRECIS) for kk in 
+                 (x-(h1*self.e[0]+k1*self.e[1]+l1*self.e[2]))]
+        q_point3=[round(self.no_of_kpoints[m2]*\
+                round(sum([q_point2[m]*einv[m2][m] for m in range(3)]),PRECIS)\
+                     ) for m2 in range(3)] #transform from cartesian to crystal coordinates, then we have a cube of points
+        print(q_point3)
+        if  k_point3[0]==q_point3[0] and k_point3[1]==q_point3[1] and k_point3[2]==q_point3[2]:
+          found=1
+          print('found')
+          k[3]=nnq
+          break
+       if found: break
+      if found: break
+     if found: break
+    if found: break
+   if not found: 
+    print('nwq nonwq',k)
+    k[3]=len(NONEQ2)
+    NONEQ2.append(k)
+  
+  print('New noneq len',len(NONEQ2))
+  self.NONEQ=NONEQ2
+
+
 
  def find_k_plus_q(self,k,allk,q):
   einv=np.linalg.inv(np.transpose(self.e))

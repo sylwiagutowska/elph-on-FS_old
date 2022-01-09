@@ -1,0 +1,7 @@
+ read structure...
+Traceback (most recent call last):
+  File "/home/sylwia/qe/bin/elph_on_FS/elph_on_FS.py", line 12, in <module>
+    structure.read_structure()
+  File "/home/sylwia/qe/bin/elph_on_FS/structure.py", line 23, in read_structure
+    self.prefix=glob.glob(self.tmp_dir+'/*.xml')[0].replace('/','.').split('.')[-2]
+IndexError: list index out of range

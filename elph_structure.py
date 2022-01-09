@@ -26,21 +26,21 @@ class elph_structure():
   self.KPOINTS_all_all_q=[]
   self.SUMMED_COLORS=[]
   self.lambda_or_elph=lambda_or_elph
- def parallel_job(self,structure,el_structure,phh_structure):
+ def parallel_job(self,structure,structure_extra,el_structure,phh_structure):
   nq=len(phh_structure.Q)
   no_of_pool=nq
   with Pool(no_of_pool) as pol:
    results=pol.map(self.single_job,
-              [[int(q+1),structure,phh_structure,el_structure,self.lambda_or_elph] for q in range(nq)])
+              [[int(q+1),structure,structure_extra,phh_structure,el_structure,self.lambda_or_elph] for q in range(nq)])
    self.ALL_COLORS=[ i[0] for i in results]
    self.KPOINTS_all_all_q=[ i[1] for i in results]
  def single_job(self,args):
-  [q,structure,phh_structure,el_structure,lambda_or_elph]=args
+  [q,structure,structure_extra,phh_structure,el_structure,lambda_or_elph]=args
   print('calculations for '+str(q)+'. of total '+str(len(phh_structure.Q))+' q points')
   elph_q=elph_structure_single_q(phh_structure)
-  elph_q.make_kpoints_single_q(q,structure,phh_structure.Q[q-1])
-  elph_q.read_elph_single_q(q,phh_structure,el_structure,structure )
-  elph_q.elph_single_q_in_whole_kgrid(q,structure,\
+  elph_q.make_kpoints_single_q(q,structure,structure_extra,phh_structure.Q[q-1])
+  elph_q.read_elph_single_q(q,phh_structure,el_structure,structure,structure_extra )
+  elph_q.elph_single_q_in_whole_kgrid(q,structure,structure_extra,\
                 phh_structure,el_structure,lambda_or_elph)  #'lambda' or 'elph'
   return [elph_q.COLORS,elph_q.KPOINTS_all]
   print(str(q)+'. point ended')
@@ -120,40 +120,6 @@ class elph_structure():
     h.write(str(k)+'\n')
   h.close()
 
- '''
- def extrapolate_value(self,x,y,z,nx,ny,nz,bnd,allk):
-  suma=0
-  nsuma=0
-  if x!=0: 
-   kp1=x*ny*ny+y*nz+z
-   suma+=bnd[allk[kp1][3]]
-   nsuma+=1
-  if x!=nx-1: 
-   kp1=(x+1)*ny*ny+y*nz+z
-   suma+=bnd[allk[kp1][3]]
-   nsuma+=1
-  if y!=0: 
-   kp1=x*ny*ny+y*nz+z
-   suma+=bnd[allk[kp1][3]]
-   nsuma+=1
-  if y!=ny-1: 
-   kp1=x*ny*ny+(y+1)*nz+z
-   suma+=bnd[allk[kp1][3]]
-   nsuma+=1
-  if z!=0: 
-   kp1=x*ny*ny+y*nz+z-1
-   suma+=bnd[allk[kp1][3]]
-   nsuma+=1
-  if z!=nz-1: 
-   kp1=x*ny*ny+y*nz+z+1
-   suma+=bnd[allk[kp1][3]]
-   nsuma+=1
-  if suma!=0: return suma/nsuma
-  else: return 0
-  '''
-
-
-
   
 class elph_structure_single_q():
  def __init__(self,phh_structure):
@@ -170,7 +136,7 @@ class elph_structure_single_q():
   self.lambda_or_elph='' #'lambda' or 'elph'
   self.COLORS=[]
 
- def make_kpoints_single_q(self,q_no,basic_structure,q):
+ def make_kpoints_single_q(self,q_no,basic_structure,basic_structure_extra,q):
   print('make kgrid at given q')
   self.pm=[0,-1,1]
   tree = ET.parse(self.elph_dir+'elph.'+str(q_no)+'.1.xml')
@@ -199,6 +165,7 @@ class elph_structure_single_q():
      if found==1: break
     if found==1: break
     '''
+  ''' not extrapolated
   structure_new=structure.structure()
   structure_new.NONEQ=list(self.KPOINTS)
   structure_new.SYMM=list(basic_structure.SYMM)
@@ -219,6 +186,39 @@ class elph_structure_single_q():
   self.KPQ=[]
   for k in self.KPOINTS:
    self.KPQ.append(structure_new.find_k_plus_q(k, self.KPOINTS_all,q)) #[kpq,no its nonequivalent in kpoints list for this q, no its nonequivalent in basic kpoint list]
+  '''
+
+  print('making new')
+  structure_new=structure.structure()
+  structure_new.NONEQ=list(self.KPOINTS)
+  structure_new.SYMM=list(basic_structure.SYMM)
+  structure_new.SYMM_crystal=list(basic_structure.SYMM_crystal)
+  structure_new.e=basic_structure.e
+  structure_new.no_of_kpoints=basic_structure.no_of_kpoints
+  structure_new.check_symm(q,basic_structure.NONEQ)
+  print('making extra')
+  structure_new_extra=structure.structure()
+  structure_new_extra.SYMM=list(structure_new.SYMM)
+  structure_new_extra.SYMM_crystal=list(structure_new.SYMM_crystal)
+  structure_new_extra.e=structure_new.e
+  structure_new_extra.allk=basic_structure_extra.allk
+  structure_new_extra.no_of_kpoints=basic_structure_extra.no_of_kpoints
+  structure_new_extra.calc_noneq()
+
+
+  print(q_no,'no of sym',len(structure_new.SYMM))
+  self.SYMM_q=structure_new.SYMM_crystal
+  structure_new_extra.make_kgrid(q_no)
+  structure_new_extra.find_newkpoints_in_old_list(basic_structure.allk) #aatach 4-th element to each k:  #it's nonequivalent in basic k-point list. Added to both allk AND NONEQ
+  self.KPOINTS_all=structure_new_extra.allk
+  self.WEIGHTS_OF_K=structure_new_extra.WK
+  self.KPOINTS=structure_new_extra.NONEQ
+#  print(q_no,[ i for i in self.KPOINTS if [4]==None])
+#  self.KPOINTS_all_all_q.append(structure_new.allk)
+
+  self.KPQ=[]
+  for k in self.KPOINTS:
+   self.KPQ.append(structure_new_extra.find_k_plus_q(k, self.KPOINTS_all,q)) #[kpq,no its nonequivalent in kpoints list for this q, no its nonequivalent in basic kpoint list]
 
 
  def w0gauss(self,x):
@@ -230,7 +230,7 @@ class elph_structure_single_q():
   return sqrtpm1 * np.exp ( - arg) * (2.0 - ( 2.0)**0.5 * x2)/degauss
 
  
- def read_elph_single_q(self,q_point_no,phh_structure,el_structure,structure): 
+ def read_elph_single_q(self,q_point_no,phh_structure,el_structure,structure,structure_extra): 
   print(str(q_point_no)+': read elph from file...')
   #read info from first file
   tree = ET.parse(self.elph_dir+'elph.'+str(q_point_no)+'.1.xml')
@@ -240,13 +240,16 @@ class elph_structure_single_q():
   print(str(q_point_no)+': From all '+str(self.nbnd_el)+' bands detected in elph calc. only bands ',el_structure.bands_num,' cross EF and will be written in frmsf')
   self.fermi_nbnd_el=len(el_structure.bands_num)
 #  ELPH=[[[ [] for k in range(self.nkp)] for j in range(self.nbnd_el)] for i in range(self.fermi_nbnd_el)] #stores elph[k][ibnd][jbnd][nmode]
-  ELPH=np.zeros(shape=(self.fermi_nbnd_el,self.fermi_nbnd_el,\
+  ELPH0=np.zeros(shape=(self.fermi_nbnd_el,self.fermi_nbnd_el,\
                 self.nkp,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
+  ELPH=np.zeros(shape=(self.fermi_nbnd_el,self.fermi_nbnd_el,\
+                self.nkp_extra,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
+  elphk=np.zeros(shape=(len(structure.allk)), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
   ELPH2=np.zeros(shape=(phh_structure.no_of_modes,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
 #  self.ELPH_sum1=np.zeros(shape=(self.fermi_nbnd_el,\
 #           self.nkp,phh_structure.no_of_modes,phh_structure.no_of_modes),dtype=complex)
   self.ELPH_sum=np.zeros(shape=(self.fermi_nbnd_el,\
-           self.nkp,phh_structure.no_of_modes),dtype=complex)
+           self.nkp_extra,phh_structure.no_of_modes),dtype=complex)
 #  self.ELPH_sum0=np.zeros(shape=(self.fermi_nbnd_el,\
 #           self.nkp,phh_structure.no_of_modes,phh_structure.no_of_modes),dtype=complex)
 #stores elph[ibnd][k][nmode][mmode]
@@ -276,13 +279,33 @@ class elph_structure_single_q():
 #       elph_k_ii=symmetrize((elph_k_ii))
        for numjband,jband in enumerate(el_structure.bands_num):
         for numiband,iband in enumerate(el_structure.bands_num):
-          ELPH[numjband][numiband][k-1][nmode]=elph_k[iipert*self.nbnd_el*npert+jband*self.nbnd_el+iband]
+          ELPH0[numjband][numiband][k-1][nmode]=elph_k[iipert*self.nbnd_el*npert+jband*self.nbnd_el+iband]
 #          elph_k[jband*self.nbnd_el*npert+iband*npert+iipert] #--wrong
 #          elph_k[iipert*self.nbnd_el*npert+iband*self.nbnd_el+jband] #--rather wrong
 #              CALL iotk_write_dat(iunpun, "PARTIAL_ELPH", &
 #                                         el_ph_mat_rec_col(:,:,ik,:))
 #		el_ph_mat_rec_col(nbnd,nbnd,nksqtot,npe)
    imode=imode+npert   
+
+   [nx,ny,nz]=structure.no_of_kpoints
+   [nx2,ny2,nz2]=structure_extra.no_of_kpoints
+   self.X,self.Y,self.Z=np.linspace(0,nx,nx+1),np.linspace(0,ny,ny+1),np.linspace(0,nz,nz+1)
+   X2,Y2,Z2=np.linspace(0,nx2-1,nx2),np.linspace(0,ny2-1,ny),np.linspace(0,nz2-1,nz2)
+   for numjband,jband in enumerate(el_structure.bands_num):
+    for numiband,iband in enumerate(el_structure.bands_num):
+     for nmode in range(len(ELPH0[numjband][numiband])):
+      for noldk,oldk in enumerate(structure_new.allk):
+       elphk[noldk]=ELPH[numjband][numiband][oldk[4]][nmode]
+      elph_interp=RegularGridInterpolator((self.X,self.Y,self.Z), elph)
+      elph_extra=[elph_interp[nbnd]([i,j,k])[0]  for k in Z2  for j in Y2  for i in X2 ] 
+      for nk,k in enumerate(structure_extra.NONEQ):
+       for nk2,k2 in enumerate(structure_extra.allk):
+        if k2[3]==nk:
+         ELPH[numjband][numiband][nk][nmode]=elph_extra[nk2]
+         break
+
+
+
 
   
   for iband in range(self.fermi_nbnd_el):
@@ -305,7 +328,7 @@ ELPH2, structure.at,structure.e, structure.SYMM_crystal, self.SYMM_q)
     #print (self.ELPH_sum[iband][k-1])
 
   '''
-  #złes
+  #zles
   for k in range(1,self.nkp+1):
    for iband in range(self.fermi_nbnd_el):
     for jband in range(self.fermi_nbnd_el):

@@ -28,6 +28,16 @@ sstructure.make_kgrid()
 
 el_structure=el_structure.el_structure(sstructure)
 el_structure.read_el_structure()
+el_structure.read_extra_el_structure()
+structure_extra= copy.deepcopy(sstructure)
+structure_extra.NONEQ=el_structure.NONEQ_extra
+structure_extra.WK=el_structure.WK_extra
+structure_extra.no_of_kpoints=el_structure.nk_extra
+print(structure_extra.NONEQ[:50])
+print(sstructure.NONEQ[:50])
+structure_extra.make_kgrid()
+#structure_extra.find_newkpoints_in_old_list(sstructure.allk)
+#structure_extra.find_weights_in_old_list(sstructure.allk)
 
 
 phh_structure=ph_structure.ph_structure(sstructure)
@@ -46,7 +56,7 @@ AMU_SI           = 1.660538782e-27  #Kg
 AMU_AU           = AMU_SI / ELECTRONMASS_SI
 AMU_RY           = AMU_AU / 2. #=911.44
 RY_TO_THZ=3289.8449
-pb_mass=207.2
+pb_mass=207.2*9.3975038
 
 
 
@@ -64,11 +74,11 @@ sstructure.at,sstructure.e,
  print('diagonalized')
  phh_structure.DYN[qno]=[dyn]
  a=np.linalg.eig(dyn)
- phh_structure.FREQ[qno]=abs(a[0])**0.5*RY_TO_THZ
- print( qno,phh_structure.DYN[qno], phh_structure.FREQ[qno])
+ phh_structure.FREQ[qno]=( abs(a[0].real)**0.5-(abs(a[0].imag))**0.5 )*RY_TO_THZ
+ print( qno+1,phh_structure.DYN[qno], phh_structure.FREQ[qno])
  #print(round_complex(a[0]*RY_TO_THZ*RY_TO_THZ))
  #print(round_complex(a[1]))
- #exit()
+exit()
 
 
 elphh_structure=elph_structure.elph_structure(phh_structure,'lambda')
@@ -84,8 +94,8 @@ for q in range(1,len(ph_structure.Q)+1):
                 ph_structure,el_structure,'lambda')  #'lambda' or 'elph'
 elph_structure.sum_over_q(ph_structure,structure,el_structure)
 '''
-elphh_structure.parallel_job(sstructure,el_structure,phh_structure)
-#elph_structure.single_job([29,structure,ph_structure,el_structure,'lambda'])
+#elphh_structure.parallel_job(sstructure,structure_extra,el_structure,phh_structure)
+elphh_structure.single_job([2,sstructure,structure_extra,phh_structure,el_structure,'lambda'])
 elphh_structure.sum_over_q(phh_structure,sstructure,el_structure)
 elphh_structure.extrapolate_values(sstructure,el_structure)
 
