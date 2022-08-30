@@ -13,14 +13,18 @@ class ph_structure():
   self.ORDER_OF_IRR=[]
   self.nat=0
   self.Q=[]
+  self.Q_crystal=[]
   self.no_of_modes=0
   self.DYN=[]
   self.DYN2=[]
   self.multiplicity_of_qs=[]
+  self.qstar=[]
 #  self.SYMMQ=[]
   self.PATT=[]
   self.prefix=structure.prefix
+  self.prefixdyn=structure.prefixdyn
   self.elph_dir=structure.tmp_dir+'/_ph0/'+self.prefix+'.phsave/'  
+  self.e=structure.e
 
  def read_dyn_of_q(self,tmp):
   '''
@@ -52,19 +56,19 @@ class ph_structure():
        for jj in range(3):
         for nb in range(self.nat):
          nu=3*nb+jj
-         dyn[mu][nu]=tmp_dyn[na*self.nat*3+nb*3][ii][jj] #/sqrt(mass_a*mass_b)/amu_ry
+         dyn[mu][nu]=tmp_dyn[na*self.nat+nb][ii][jj] #/sqrt(mass_a*mass_b)/amu_ry
 #     break #if 'Diagonalizing' in i: break  
      all_dyn.append(dyn)
     if 'Diagonalizing' in i: break  
-  EIG=np.linalg.eig((all_dyn[0]))
-  print('eigenvalue',EIG[0],'multiplicity',len(all_dyn))
+ # EIG=np.linalg.eig((all_dyn[0]))
+#  print('eigenvalue',EIG[0],'multiplicity',len(all_dyn))
   self.DYN.append(all_dyn)
 
 
  def read_dyns_nonsymmetrized(self):
   for q in range(1,len(self.Q)+1):
     DYNMATS=np.zeros((3*self.nat,3*self.nat),dtype=complex)
-    for i in range(self.no_of_modes+1):
+    for i in range(3*self.nat+1):
      try: tree = ET.parse(self.elph_dir+'/dynmat.'+str(q)+'.'+str(i)+'.xml')
      except: continue
      root = tree.getroot()
@@ -84,9 +88,15 @@ class ph_structure():
    self.no_of_modes=len(self.FREQ[-1])
 
  def read_q(self,tmp):
+
    for ni,i in enumerate(tmp):
     if 'q = ' in i:
-     self.Q.append([round(float(m),PRECIS) for m in i.split()[3:6] ])
+     self.Q.append(np.round([float(m) for m in i.split()[3:6] ],PRECIS))
+     qcryst=np.round(np.dot(np.linalg.inv(np.transpose(self.e)),self.Q[-1]),PRECIS)
+     for m in range(3):
+      while qcryst[m]<0: qcryst[m]+=1
+      while qcryst[m]>=1: qcryst[m]-=1
+     self.Q_crystal.append(np.round(qcryst,PRECIS-1))
      break 
 
 
@@ -110,8 +120,8 @@ class ph_structure():
     for nmode,mode in enumerate(self.DEG[-1]):
      if mode==numf2:
       self.NONDEG_no[-1][-1].append(nmode)     
-  print (self.NONDEG_no) 
-  print (self.FREQ)
+ # print (self.NONDEG_no) 
+ # print (self.FREQ)
 
   for q in range(1,len(self.Q)+1):
      '''
@@ -128,26 +138,29 @@ class ph_structure():
      EIG=np.linalg.eig((DYNMAT))
      '''
      EIG=np.linalg.eig((self.DYN[q-1][0]))
-#     self.ORDER_OF_IRR.append(np.argsort([abs(i) for i in EIG[0]]))
+  #   self.ORDER_OF_IRR.append(np.argsort([abs(i) for i in EIG[0]]))
      self.ORDER_OF_IRR.append([i for i in range(len(EIG[0]))])
 #  exit()
 
  def read_multiplicity_of_q(self,dynfile):
   multiplicity=0
-  for i in dynfile:
+  qstars=[]
+  for ni,i in enumerate(dynfile):
    if 'Dynamical  Matrix in cartesian axes' in i:
     multiplicity=multiplicity+1
+    qstars.append([float(m) for m in dynfile[ni+2].split()[3:6]])
+  self.qstar.append(qstars)
   self.multiplicity_of_qs.append( multiplicity)
 
  def read_ph_structure(self):
   ###read frequencies and make DEG[q][nbnd] = no of band, with whom the nbnd is degenerated
   print(' read phonon structure')
-  h=open(self.prefix+'.dyn1')
+  h=open(self.prefixdyn+'.dyn1')
   for i in range(3): tmp=h.readline()
   h.close()
   self.nat=int(tmp.split()[1])
   for file in range(1,100):
-   try: h=open(self.prefix+'.dyn'+str(file))
+   try: h=open(self.prefixdyn+'.dyn'+str(file))
    except: break
    tmp=h.readlines()
    h.close()
@@ -159,36 +172,14 @@ class ph_structure():
   self.read_dyns_nonsymmetrized()
 
 
- '''
- def check_symm_of_q(self,structure):
-  self.SYMMQ=[ ]
-  self.pm=[0,1,-1]
-  for nq in self.Q:
-   self.SYMMQ.append([])
-   for sym in structure.SYMM:
-    found=0
-    x=[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
-    for h1 in self.pm:
-     for k1 in self.pm:
-      for l1 in self.pm:
-       q2=[round(kk,PRECIS) for kk in 
-                 (x-(h1*structure.e[0]+k1*structure.e[1]+l1*structure.e[2]))]
-       if (nq[0]==q2[0] and nq[1]==q2[1] and nq[2]==q2[2]):
-         found=1
-         break
-      if found==1: break
-     if found==1: 
-      self.SYMMQ[-1].append(sym)
-      break
-#  for i in self.SYMMQ: print len(i)
- '''       
 
  def read_patterns(self):
   for q in range(len(self.Q)):
    self.PATT.append([])
    tree = ET.parse(self.elph_dir+'/patterns.'+str(q+1)+'.xml')
    root = tree.getroot()
-   for i in range(len(self.NONDEG[q])):
+   nirr=int(root.find('IRREPS_INFO/NUMBER_IRR_REP').text)
+   for i in range(nirr):
      rep=root.find('IRREPS_INFO/REPRESENTION.'+str(i+1))
      npert=int(rep.find('NUMBER_OF_PERTURBATIONS').text)
      for j in range(npert):
@@ -199,6 +190,10 @@ class ph_structure():
 ##################################
 
 def dyn_pattern_to_cart(nat, u, dyn):
+#  ! This routine rotates the dynamical matrix dynwork written
+#  ! in cartesian basis to the basis of the patterns u and adds it to
+#  ! the dynamical matrix dyn that is supposed to be in the basis of the
+#  ! patterns.
   phi=np.zeros((nat,nat,3,3),dtype=complex)
   for i in range(3*nat):
    na=int(np.floor(i/3))
@@ -209,8 +204,8 @@ def dyn_pattern_to_cart(nat, u, dyn):
     work=0j
     for mu in range(3*nat):
      for nu in range(3*nat):
-      work+=u[mu][i] * dyn[nu][mu] * np.conjugate(u[nu][j])
-    phi[na][nb][jcart][icart]=work
+      work+= u[mu][i] * dyn[nu][mu] * np.conjugate(u[nu][j])
+    phi[nb][na][jcart][icart]=work
   return phi
 
 def trn_to_cart(wrk,bg):
@@ -239,7 +234,7 @@ def compact_dyn(phi,nat):
     for nb in range(nat):
      for jcart in range(3):
       jmode=3*nb+jcart
-      dyn[jmode][imode]=phi[na][nb][jcart][icart]
+      dyn[jmode][imode]=phi[nb][na][jcart][icart]
   return dyn
 
 def scompact_dyn(dyn,nat):
@@ -250,80 +245,105 @@ def scompact_dyn(dyn,nat):
     for nb in range(nat):
      for jcart in range(3):
       jmode=3*nb+jcart
-      phi[na][nb][icart][jcart]=dyn[imode][jmode]
+      phi[nb][na][jcart][icart]=dyn[jmode][imode]
   return phi   
 
-def symmetrize_if_minus_q(phi,s,nt,irotmq):
+def symmetrize_if_minus_q(phi,s,nat,irt,irotmq,rtau,q):
+ phip=np.zeros(phi.shape,dtype=complex)
  for na in range(nat):
   for nb in range(nat): 
    for ipol in range(3):
     for jpol in range(3):
      work=np.zeros((3,3),dtype=complex)
-     sna=na #irt[na][irotmq]
-     snb=nb #irt[nb][irotmq]
-     arg=0
-     for kpol in range(3):
-      arg+= 0 #q[kpol] * (rtau[na][irotmq][kpol] - rtau[nb][irotmq][kpol])
-     arg=arg*np.pi
+     sna=irt[na][irotmq]
+     snb=irt[nb][irotmq]
+     dr=rtau[na][irotmq] - rtau[nb][irotmq]
+     arg=sum([ q[kpol]* dr[kpol] for kpol in range(3)])
+     arg=arg*2*np.pi
      fase=np.cos(arg)+1j*np.sin(arg)
      for kpol in range(3):
       for lpol in range(3):
-       work[jpol][ipol] += s[irotmq][kpol][ipol]*s[irotmq][lpol][jpol]* phi[sna][snb][lpol][kpol]*fase
-     phip[na][nb][jpol][ipol]=(phi[na][nb][jpol][ipol]+ np.conjugate(work[jpol][ipol]))*0.5
+       work[jpol][ipol] += s[irotmq][kpol][ipol]*s[irotmq][lpol][jpol]* phi[snb][sna][lpol][kpol]*fase
+     phip[nb][na][jpol][ipol]=(phi[nb][na][jpol][ipol]+ np.conjugate(work[jpol][ipol]))*0.5
  return phip
 
-def symmetrize_small_qgroup(phi,s,nat):
+def symmetrize_small_qgroup(phi,s,nat,irt,rtau,q):
  sinv=[np.linalg.inv(i) for i in s]
  iflb=np.zeros((nat,nat),dtype=complex)
  faseq=np.zeros((len(s)),dtype=complex)
  for na in range(nat):
   for nb in range(nat): 
-   if iflb[na][nb]==0: 
+   if iflb[nb][na]==0: 
     work=np.zeros((3,3),dtype=complex)
     for isymq in range(len(s)):
      irot=isymq
-     sna=na #irt[na][irot]
-     snb=nb #irt[nb][irot]
-     arg=0 #sum([ q[ipol]* (rtau[na][irot][ipol] - rtau[nb][irot][ipol]) for ipol in range(3)])
-     arg=arg*np.pi
-     faseq[isymq]=1 #np.cos(arg)+1j*np.sin(arg)
+     sna=irt[na][irot]
+     snb=irt[nb][irot]
+     dr=rtau[na][irot] - rtau[nb][irot]
+     arg=sum([ q[ipol]* dr[ipol] for ipol in range(3)])
+     arg=arg*2*np.pi
+     faseq[isymq]=np.cos(arg)+1j*np.sin(arg)
      for ipol in range(3):
       for jpol in range(3):
        for kpol in range(3):
         for lpol in range(3):
-         work[jpol][ipol] += s[irot][kpol][ipol]*s[irot][lpol][jpol] *phi[sna][snb][lpol][kpol] * faseq[isymq]
+         work[jpol][ipol] += s[irot][kpol][ipol]*s[irot][lpol][jpol] *(phi[snb][sna][kpol][lpol]) * faseq[isymq]
     for isymq in range(len(s)):
       irot=isymq
-      sna=na #irt[na][irot]
-      snb=nb #irt[nb][irot]
+      sna=irt[na][irot]
+      snb=irt[nb][irot]
       for ipol in range(3):
        for jpol in range(3):
-        phi[sna][snb][jpol][ipol]=0.j
+        phi[snb][sna][jpol][ipol]=0.j
         for kpol in range(3):
          for lpol in range(3):
-          phi[sna][snb][jpol][ipol] += sinv[irot][kpol][ipol]*sinv[irot][lpol][jpol] * work[lpol][kpol]*np.conjugate(faseq[isymq])
-    iflb[sna][snb]=1
+          phi[snb][sna][jpol][ipol] += sinv[irot][kpol][ipol]*sinv[irot][lpol][jpol] * (work[lpol][kpol])*np.conjugate(faseq[isymq])
+      iflb[snb][sna]=1
  phi=phi/len(s)
  return phi  
 
+def if_minus_q(q,s):
+ mq=-q
+# for i in range(3):
+#  while mq[i]<0: mq[i]+=1
+#  while mq[i]>=1: mq[i]-=1
+ for ns,sym in enumerate(s):
+  mq2=np.round(np.dot(sym,mq),PRECIS)
+  for i in range(3):
+   while mq2[i]<0: mq2[i]+=1
+   while mq2[i]>=1: mq2[i]-=1
+  mq2=np.round(mq2,PRECIS)
+  q2=np.round(q,PRECIS)
+  if mq2[0]==q2[0] and mq2[1]==q2[1] and mq2[2]==q2[2]: return ns
+ else: return -1
 
-def symmetrize(nat,pattern,dyn,at,bg,s,s_of_q ):
-  phi=dyn_pattern_to_cart(nat, pattern, dyn)
-  for na in range(nat):
-   for nb in range(nat):
-    phi[na][nb]=trn_to_cryst(phi[na][nb],at)
+def impose_hermicity(phi,nat):
   #impose hermecity
   for na in range(nat):
    for nb in range(nat):
     for ipol in range(3):
      for jpol in range(3):
-      phi[na][nb][ipol][jpol]=0.5 * (phi[na][nb][ipol][jpol] + np.conjugate(phi[nb][na][jpol][ipol]))
-      phi[nb][na][jpol][ipol]=np.conjugate(phi[na][nb][ipol][jpol])
-  phi=symmetrize_small_qgroup(phi,s_of_q,nat)
+      phi[nb][na][jpol][ipol]=0.5 * (phi[nb][na][jpol][ipol] + np.conjugate(phi[na][nb][ipol][jpol]))
+      phi[na][nb][ipol][jpol]=np.conjugate(phi[nb][na][jpol][ipol])
+  return phi 
+
+def symmetrize(nat,pattern,dyn,at0,bg,s,s_of_q,irt,rtau,q,q_cart ):
+  #rtau= input: the R associated at each  ,  irt (48, nat)=input: the rotated of each atom, isym=s_of_q=input: the small group of q
+  at=np.linalg.inv(np.transpose(bg)) #/2/np.pi
+  phi=dyn_pattern_to_cart(nat, pattern, dyn)
   for na in range(nat):
    for nb in range(nat):
-    phi[na][nb]=trn_to_cart(phi[na][nb],bg)
+    phi[nb][na]=trn_to_cryst(phi[nb][na],at)
+  phi=impose_hermicity(phi,nat)
+  irotmq=if_minus_q(q,s_of_q)
+  if irotmq!=-1: phi=symmetrize_if_minus_q(phi,s_of_q,nat,irt,irotmq,rtau,q ) 
+  phi=symmetrize_small_qgroup(phi,s_of_q,nat,irt,rtau,q )
+  if irotmq!=-1: print(q,'MQ present')
+  for na in range(nat):
+   for nb in range(nat):
+    phi[nb][na]=trn_to_cart(phi[nb][na],bg)
+ #   print(na,nb,'\n',phi[na][nb])
   phi=compact_dyn(phi,nat)
-  return phi.transpose()
+  return phi #.transpose()
 
 
