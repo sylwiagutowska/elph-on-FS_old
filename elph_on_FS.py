@@ -34,7 +34,7 @@ phh_structure=ph_structure.ph_structure(sstructure)
 phh_structure.read_ph_structure()
 #ph_structure.check_symm_of_q(structure)
 
-phh_structure.read_patterns()
+
 #print(phh_structure.PATT[1])
 basic_structure=sstructure
 
@@ -60,23 +60,22 @@ h=open('macierze_dyn.dat','w')
 for qno in range(len(phh_structure.Q)):
  print(qno,phh_structure.Q_crystal[qno])
  structure_new=copy.deepcopy(sstructure)
- structure_new.check_symm(phh_structure.Q[qno],sstructure.NONEQ)
+ structure_new.check_symm(phh_structure.Q_crystal[qno],sstructure.NONEQ,phh_structure.no_of_s_q[qno],qno)
  structure_new.calc_irt()
 #print(len(structure_new.SYMM))
 # print(phh_structure.DYN2[qno],np.sum(phh_structure.DYN2[qno],axis=0))
  dyn=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[qno]),
      (phh_structure.DYN2[qno]), sstructure.at,sstructure.e,
      sstructure.SYMM_crystal, structure_new.SYMM_crystal,
-     structure_new.irt,structure_new.rtau,phh_structure.Q_crystal[qno],phh_structure.Q[qno])
+     structure_new.irt,structure_new.rtau,phh_structure.Q_crystal_orig[qno] )
 # print(round_complex(dyn))
- print('symmetrizied')
  for i in range(3):
   for na in range(phh_structure.nat):
    mu=3*(na)+i
    for j in range(3):
     for nb in range(phh_structure.nat):
      nu=3*(nb)+j
-     dyn [mu][nu] = dyn [mu][nu] / ( amass[nb]*amass[na])**0.5
+     dyn [mu][nu] = dyn [mu][nu] / ( amass[na]*amass[nb])**0.5
 
  dyn=np.round(dyn,decimals=10)
  dyn=dyn/AMU_RY
@@ -97,16 +96,18 @@ for qno in range(len(phh_structure.Q)):
   h.write('\n')
  jedynki.append([round(i/prevfreq[ni],4) for ni,i in enumerate(sorted(phh_structure.FREQ[qno]))])
  for i in jedynki[-1]:  h.write(str(i)+'\n')
- if sum(jedynki[-1])!=len(jedynki[-1]): print(structure_new.SYMM_crystal,phh_structure.Q_crystal[qno],phh_structure.Q[qno])
+ #if sum(jedynki[-1])!=len(jedynki[-1]): print(structure_new.SYMM_crystal,phh_structure.Q_crystal[qno],phh_structure.Q[qno])
 h.close()
  #print(round_complex(a[0]*RY_TO_THZ*RY_TO_THZ))
  #print(round_complex(a[1]))
 
 
 for ni,i in enumerate(jedynki):
- if sum(i)!=len(i): print('Q',ni+1,phh_structure.Q_crystal[ni],'wrong! freq/freq=',i)
-
-exit()
+ if sum(i)!=len(i): 
+  print('Q',ni+1,phh_structure.Q_crystal[ni],'wrong! freq/freq=',i)
+ # print(phh_structure.FREQ[ni])
+#print(sstructure.e)
+#exit()
 
 elphh_structure=elph_structure.elph_structure(phh_structure,'lambda')
 

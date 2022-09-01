@@ -7,8 +7,9 @@ from multiprocessing import Process,Pool
 import copy
 PRECIS=6
 RY_TO_THZ=3289.8449
-def symmetrize(a):
-    """
+
+#def symmetrize(a):
+"""
     Return a symmetrized version of NumPy array a.
 
     Values 0 are replaced by the array value at the symmetric
@@ -19,9 +20,9 @@ def symmetrize(a):
 
     a -- square NumPy array, such that a_ij = 0 or a_ji = 0, 
     for i != j.
-    """
-    return a + a.T - np.diag(a.diagonal())
-
+"""
+ #   return a + a.T - np.diag(a.diagonal())
+#
 class elph_structure():
  def __init__(self,phh_structure,lambda_or_elph):
   self.ALL_COLORS=[[] for i in range(len(phh_structure.Q))] 
@@ -39,8 +40,8 @@ class elph_structure():
  def single_job(self,args):
   [q,structure,phh_structure,ell_structure,lambda_or_elph]=args
   print('calculations for '+str(q)+'. of total '+str(len(phh_structure.Q))+' q points')
-  elph_q=elph_structure_single_q(phh_structure)
-  elph_q.make_kpoints_single_q(q,structure,phh_structure.Q[q-1],phh_structure.qstar[q-1])
+  elph_q=elph_structure_single_q(q,phh_structure)
+  elph_q.make_kpoints_single_q(q,structure,phh_structure.Q[q-1],phh_structure.Q_crystal[q-1],phh_structure.qstar[q-1])
   elph_q.read_elph_single_q(q,phh_structure,ell_structure,structure )
   elph_q.elph_single_q_in_whole_kgrid(q,structure,\
                 phh_structure,ell_structure,lambda_or_elph)  #'lambda' or 'elph'
@@ -83,10 +84,11 @@ class elph_structure():
 
   
 class elph_structure_single_q():
- def __init__(self,phh_structure):
+ def __init__(self,q,phh_structure):
   self.ELPH_sum=[]
   self.elph_dir=phh_structure.elph_dir
   self.prefix=phh_structure.prefix
+  self.no_of_s_q=phh_structure.no_of_s_q[q-1]
   self.KPOINTS=[] #[0:2] list of noneq k at given q [3] its no in list of nonequivalent kpoints at given q  (self.KPOINTS)  and [4] its no in list of nonequivalent kpoints of electronic structure (ell_structure.NONEQ)
   self.WEIGHTS_OF_K=[]
   self.nbnd_el=0
@@ -97,7 +99,7 @@ class elph_structure_single_q():
   self.lambda_or_elph='' #'lambda' or 'elph'
   self.COLORS=[]
 
- def make_kpoints_single_q(self,q_no,basic_structure,q,qstar):
+ def make_kpoints_single_q(self,q_no,basic_structure,q,q_cryst,qstar):
   print('make kgrid at given q')
   self.pm=[0,-1,1]
   tree = ET.parse(self.elph_dir+'elph.'+str(q_no)+'.1.xml')
@@ -112,9 +114,9 @@ class elph_structure_single_q():
    self.KPOINTS[numki].append(numki)
   structure_new=copy.deepcopy(basic_structure)
   structure_new.NONEQ=list(self.KPOINTS)
+  structure_new.calc_noneq_cryst() #results in NONEQ_cryst
   structure_new.no_of_kpoints=basic_structure.no_of_kpoints
-  structure_new.check_symm(q,basic_structure.NONEQ)
-  print(q_no,'no of sym',len(structure_new.SYMM))
+  structure_new.check_symm(q_cryst,basic_structure.NONEQ,self.no_of_s_q,q_no)
   structure_new.calc_irt()
   self.irt=structure_new.irt
   self.rtau=structure_new.rtau
@@ -125,10 +127,11 @@ class elph_structure_single_q():
   self.KPOINTS_all_cryst=structure_new.allk_in_crystal_coordinates
   self.WEIGHTS_OF_K=structure_new.WK
   self.KPOINTS=structure_new.NONEQ
+  self.KPOINTS_cryst=structure_new.NONEQ_cryst
 #  print(q_no,[ i for i in self.KPOINTS if [4]==None])
 #  self.KPOINTS_all_all_q.append(structure_new.allk)
 
-
+ # print(self.KPOINTS)
   '''
   print('star calculations')
   self.KPQ=[[] for qq in qstar]
@@ -138,8 +141,22 @@ class elph_structure_single_q():
   print('star ended')
   '''
   self.KPQ=[]
-  for k in self.KPOINTS:
-   self.KPQ.append(structure_new.find_k_plus_q(k, self.KPOINTS_all,self.KPOINTS_all_cryst,q))
+  for k in  self.KPOINTS_cryst:
+   self.KPQ.append(structure_new.find_k_plus_q(k, self.KPOINTS_all,self.KPOINTS_all_cryst,q_cryst))
+  h=open('q_'+str(q_no)+'.info','w')
+  h.write(str(len(self.SYMM_q))+'\n')
+  #for i in self.KPQ:
+  # for j in i:
+  #  h.write(str(j)+' ')
+  # h.write('\n')
+
+  multik=np.zeros((len(basic_structure.NONEQ)))
+  for k in self.KPQ: multik[k[2]]+=1
+  for ni,i in  enumerate( self.KPQ):
+    h.write(str(ni)+' '+str(i)+'\n')
+  h.close()
+  for i in multik: 
+   if i==0: raise ValueError(str(q_no)+' len of multik = 0')
 
   '''
   #check if kpq are ok
@@ -202,8 +219,8 @@ class elph_structure_single_q():
        for numiband,iband in enumerate(ell_structure.bands_num):
         for numjband,jband in enumerate(ell_structure.bands_num):
          ELPH[numiband][numjband][k-1][nmode]=elph_k[iipert*self.nbnd_el*self.nbnd_el+jband*self.nbnd_el+iband]
-   #       ELPH[numiband][numjband][k-1][nmode]=elph_k[jband*self.nbnd_el*npert+iband*npert+iipert] #--wrong
-   #      ELPH[numiband][numjband][k-1][nmode]=elph_k[jband*self.nbnd_el*npert+iipert*self.nbnd_el+iband] #--wrong
+   #      ELPH[numiband][numjband][k-1][nmode]=elph_k[jband*self.nbnd_el*npert+iband*npert+iipert] #--wrong
+   #      ELPH[numiband][numjband][k-1][nmode]=elph_k[iband*self.nbnd_el*npert+iipert*self.nbnd_el+jband] #--wrong
 #          elph_k[iipert*self.nbnd_el*npert+iband*self.nbnd_el+jband] #--rather wrong
 #              CALL iotk_write_dat(iunpun, "PARTIAL_ELPH", &
 #                                         el_ph_mat_rec_col(:,:,ik,:))
@@ -214,6 +231,8 @@ class elph_structure_single_q():
 
   multik=np.zeros((len(structure.NONEQ)))
   for k in self.KPQ: multik[k[2]]+=1
+  for i in multik: 
+   if i==0: raise ValueError('len of multik = 0')
   '''
   #checks if kpq are ok
   h=open('FS_'+str(q_point_no)+'.frmsf','w')
@@ -240,6 +259,10 @@ class elph_structure_single_q():
         ELPH2[iipert][jjpert]+=np.conjugate(ELPH[iband][jband][numk][iipert])*ELPH[iband][jband][numk][jjpert]*weight
       ELPH2=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[q_point_no-1]),
 ELPH2, structure.at,structure.e, structure.SYMM_crystal, self.SYMM_q,self.irt,self.rtau,phh_structure.Q_crystal[q_point_no-1] )
+# dyn=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[qno]),
+#     (phh_structure.DYN2[qno]), sstructure.at,sstructure.e,
+#     sstructure.SYMM_crystal, structure_new.SYMM_crystal,
+#     structure_new.irt,structure_new.rtau,phh_structure.Q_crystal_orig[qno] )
      for nu in range(phh_structure.no_of_modes):
        for mu in range(phh_structure.no_of_modes):
         for vu in range(phh_structure.no_of_modes):
