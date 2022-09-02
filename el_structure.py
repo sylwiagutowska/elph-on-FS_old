@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 from numpy import exp
 Ha_to_ev=13.605662285137*2
 def w0gauss(x):
-  degauss=0.1
+  degauss=0.02
   x2=x/degauss
   sqrtpm1= 1. / 1.77245385090551602729
   # cold smearing  (Marzari-Vanderbilt-DeVita-Payne)

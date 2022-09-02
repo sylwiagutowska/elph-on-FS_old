@@ -348,6 +348,7 @@ class structure():
   self.FRACTIONAL_TRANSLATION_r=[self.FRACTIONAL_TRANSLATION_r[si] for si in founded]
 
  def find_k_plus_q(self,k,allk,allk_cryst,q_cryst):
+ # print(allk_cryst)
   kpq_no=-2
   einv=np.linalg.inv(np.transpose(self.e))
   k2=k
@@ -360,13 +361,13 @@ class structure():
 #  kpq=[round(sum([kpq0[m]*self.e[m][m2] for m in range(3)]),PRECIS-1) for m2 in range(3)] #in cart
   found=0
   for sym in self.SYMM_crystal:
-     if found==1: break
-     kpq2=np.round(np.matmul(np.transpose(sym),kpq0),PRECIS-2) #in c coord
-  for i in range(3): 
-   while kpq2[i]>=1: kpq2[i]=kpq2[i]-1
-   while kpq2[i]<0: kpq2[i]=kpq2[i]+1
-  kpq2=np.round(kpq2,PRECIS-2)
-  for ki in allk_cryst:
+   if found==1: break
+   kpq2=np.round(np.matmul(np.transpose(sym),kpq0),PRECIS-2) #in c coord
+   for i in range(3): 
+    while kpq2[i]>=1: kpq2[i]=kpq2[i]-1
+    while kpq2[i]<0: kpq2[i]=kpq2[i]+1
+   kpq2=np.round(kpq2,PRECIS-2)
+   for ki in allk_cryst:
       if found==1: break
       if kpq2[0]==np.round(ki[0],PRECIS-2) and kpq2[1]==np.round(ki[1],PRECIS-2) and kpq2[2]==np.round(ki[2],PRECIS-2):
             kpq_no=ki[3]
