@@ -11,13 +11,10 @@ RY_TO_THZ=3289.8449
 #def symmetrize(a):
 """
     Return a symmetrized version of NumPy array a.
-
     Values 0 are replaced by the array value at the symmetric
     position (with respect to the diagonal), i.e. if a_ij = 0,
     then the returned array a' is such that a'_ij = a_ji.
-
     Diagonal values are left untouched.
-
     a -- square NumPy array, such that a_ij = 0 or a_ji = 0, 
     for i != j.
 """
@@ -53,15 +50,27 @@ class elph_structure():
  def sum_over_q(self,phh_structure,structure,ell_structure):
   print('summing over q...')
   self.SUMMED_COLORS=[[0 for k in range(len(structure.allk))] for jband in range(ell_structure.fermi_nbnd_el)]
-#  sum_wag=0
+  self.SUMMED_COLORS_nq=[[0 for k in range(len(structure.NONEQ))] for jband in range(ell_structure.fermi_nbnd_el)]
+  sum_wag=0
   for band in range(len(self.SUMMED_COLORS)):
    for numk,k in enumerate(structure.allk):
- #   waga=el_structure.w0gauss(-ell_structure.ENE_fs[band][k[3]])
- #   sum_wag+=waga
+    waga=el_structure.w0gauss(-ell_structure.ENE_fs[band][k[3]])
+    sum_wag+=waga
     for numq,col_q in enumerate(self.ALL_COLORS):
-     self.SUMMED_COLORS[band][numk]+=col_q[band][numk] *phh_structure.multiplicity_of_qs[numq] # *waga--done for every q
-  print ('summed lambda=',sum([ sum(i) for i in self.SUMMED_COLORS]))
-#  print ('summed wagi=',sum_wag)
+     self.SUMMED_COLORS[band][numk]+=col_q[band][numk] *phh_structure.multiplicity_of_qs[numq]  *waga #--done for every q
+  #imposing simmetry
+  for band in range(len(self.SUMMED_COLORS)):
+   for numk,k in enumerate(structure.allk):
+     self.SUMMED_COLORS_nq[band][k[3]]+=self.SUMMED_COLORS[band][numk]/structure.WK[k[3]]
+  self.SUMMED_COLORS=[[0 for k in range(len(structure.allk))] for jband in range(ell_structure.fermi_nbnd_el)]
+  for band in range(len(self.SUMMED_COLORS)):
+   for numk,k in enumerate(structure.allk):
+     self.SUMMED_COLORS[band][numk]=self.SUMMED_COLORS_nq[band][k[3]]
+
+  lam=sum([ sum(i) for i in self.SUMMED_COLORS])
+  print ('summed lambda=',lam)
+  print ('summed wagi=',sum_wag)
+  print ('summed lambda/wagi=',lam/sum_wag/sum(phh_structure.multiplicity_of_qs))
   if self.lambda_or_elph=='elph':
    h=open('elph.frmsf','w')
   else:
@@ -184,11 +193,11 @@ class elph_structure_single_q():
   ELPH=np.zeros(shape=(self.fermi_nbnd_el,self.fermi_nbnd_el,\
                 self.nkp,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
 
-  ELPH2=np.zeros(shape=(len(structure.NONEQ),phh_structure.no_of_modes,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
+  ELPH2=np.zeros(shape=(self.nkp,phh_structure.no_of_modes,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
 #  self.ELPH_sum1=np.zeros(shape=(self.fermi_nbnd_el,\
 #           self.nkp,phh_structure.no_of_modes,phh_structure.no_of_modes),dtype=complex)
   self.ELPH_sum=np.zeros(shape=(self.fermi_nbnd_el,\
-           len(structure.NONEQ),phh_structure.no_of_modes),dtype=complex)
+           self.nkp,phh_structure.no_of_modes),dtype=complex)
 #  self.ELPH_sum0=np.zeros(shape=(self.fermi_nbnd_el,\
 #           self.nkp,phh_structure.no_of_modes,phh_structure.no_of_modes),dtype=complex)
 #stores elph[ibnd][k][nmode][mmode]
@@ -213,13 +222,14 @@ class elph_structure_single_q():
       elph_k=[ complex(float(m.replace(',',' ').split()[0]), 
                        float(m.replace(',',' ').split()[1])) 
                 for m in partial_elph.text.split('\n') if len(m.split())>0  ]
+     # print('len of elpk',len(elph_k))
       for iipert in range(npert):
        nmode=imode+iipert #phh_structure.ORDER_OF_IRR[q_point_no-1][imode+iipert]
 #       elph_k_ii=symmetrize((elph_k_ii))
        for numiband,iband in enumerate(ell_structure.bands_num):
         for numjband,jband in enumerate(ell_structure.bands_num):
-         ELPH[numiband][numjband][k-1][nmode]=elph_k[iipert*self.nbnd_el*self.nbnd_el+jband*self.nbnd_el+iband]
-   #      ELPH[numiband][numjband][k-1][nmode]=elph_k[jband*self.nbnd_el*npert+iband*npert+iipert] #--wrong
+  #       ELPH[numiband][numjband][k-1][nmode]=elph_k[iipert*self.nbnd_el*self.nbnd_el+jband*self.nbnd_el+iband]
+         ELPH[numjband][numiband][k-1][nmode]=elph_k[iband*self.nbnd_el*npert+jband*npert+iipert] #--wrong
    #      ELPH[numiband][numjband][k-1][nmode]=elph_k[iband*self.nbnd_el*npert+iipert*self.nbnd_el+jband] #--wrong
 #          elph_k[iipert*self.nbnd_el*npert+iband*self.nbnd_el+jband] #--rather wrong
 #              CALL iotk_write_dat(iunpun, "PARTIAL_ELPH", &
@@ -247,28 +257,25 @@ class elph_structure_single_q():
     h.write(str(bnd[k[4]])+'\n')
   h.close()
   '''
-
+ 
   for iband in range(self.fermi_nbnd_el):
 #   sumweight=0
+  #  ELPH2=np.zeros(shape=(len(structure.NONEQ),phh_structure.no_of_modes,phh_structure.no_of_modes), dtype=complex) #stores elph[k][ibnd][jbnd][nmode]
     for numk, k in enumerate(self.KPOINTS):
-     weight2=el_structure.w0gauss(-ell_structure.ENE_fs[iband][k[4]])  
+   #  weight2=el_structure.w0gauss(-ell_structure.ENE_fs[iband][k[4]])  
      for jband in range(self.fermi_nbnd_el):
-      weight=el_structure.w0gauss(-ell_structure.ENE_fs[jband][self.KPQ[numk][2]])  *self.WEIGHTS_OF_K[self.KPQ[numk][1]]
+      weight=el_structure.w0gauss(-ell_structure.ENE_fs[jband][self.KPQ[numk][2]])  #*self.WEIGHTS_OF_K[self.KPQ[numk][1]]
       for iipert in range(phh_structure.no_of_modes):
        for jjpert in range(phh_structure.no_of_modes):
-        ELPH2[k[4]][iipert][jjpert]+=np.conjugate(ELPH[iband][jband][numk][iipert])*ELPH[iband][jband][numk][jjpert]*weight*weight2 /multik[k[4]]  
-    for k in range(len(structure.NONEQ)):  
-     ELPH2[k]=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[q_point_no-1]),
-ELPH2[k], structure.at,structure.e, structure.SYMM_crystal, self.SYMM_q,self.irt,self.rtau,phh_structure.Q_crystal[q_point_no-1] )
-# dyn=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[qno]),
-#     (phh_structure.DYN2[qno]), sstructure.at,sstructure.e,
-#     sstructure.SYMM_crystal, structure_new.SYMM_crystal,
-#     structure_new.irt,structure_new.rtau,phh_structure.Q_crystal_orig[qno] )
+        ELPH2[numk][iipert][jjpert]=np.conjugate(ELPH[iband][jband][numk][iipert])*ELPH[iband][jband][numk][jjpert]*weight  #/multik[k[4]]  
+   # for k in range(len(structure.NONEQ)):  
+     ELPH2[numk]=ph_structure.symmetrize(phh_structure.nat,np.array(phh_structure.PATT[q_point_no-1]),
+ELPH2[numk], structure.at,structure.e, structure.SYMM_crystal, self.SYMM_q,self.irt,self.rtau,phh_structure.Q_crystal[q_point_no-1] ) 
      for nu in range(phh_structure.no_of_modes):
        for mu in range(phh_structure.no_of_modes):
         for vu in range(phh_structure.no_of_modes):
-          self.ELPH_sum[iband][k][nu] += np.conjugate(phh_structure.DYN[q_point_no-1][0][nu][mu])*ELPH2[k][vu][mu]*phh_structure.DYN[q_point_no-1][0][nu][vu]  #/multik[k[4]]    
-
+          self.ELPH_sum[iband][numk][nu] += np.abs(np.conjugate(phh_structure.DYN[q_point_no-1][0][nu][mu])*ELPH2[numk][mu][vu]*phh_structure.DYN[q_point_no-1][0][vu][nu])   
+ 
   '''
   multik=np.zeros((len(structure.NONEQ)))
   for k in self.KPOINTS: multik[k[4]]+=1
@@ -310,26 +317,19 @@ ELPH2, structure.at,structure.e, structure.SYMM_crystal, self.SYMM_q)
        for mu in range(phh_structure.no_of_modes):
         for vu in range(phh_structure.no_of_modes):
           self.ELPH_sum[iband][k[4]][nu] += np.conjugate(phh_structure.DYN[q_point_no-1][0][mu][nu])*ELPH2[mu][vu]*phh_structure.DYN[q_point_no-1][0][vu][nu] /multik[k[4]]     
-
   self.ELPH_sum=self.ELPH_sum #/sumw
   '''
 
-  '''
-
-
-  multik=np.zeros((len(structure.NONEQ)))
-  for k in self.KPOINTS: multik[k[4]]+=1
+  '''  
   for iband in range(self.fermi_nbnd_el):
 #   sumweight=0
    for numk, k in enumerate(self.KPOINTS):
-   # weight2=el_structure.w0gauss(-ell_structure.ENE_fs[iband][k[4]])  #*self.WEIGHTS_OF_K[k[3]]
+    weight2=el_structure.w0gauss(-ell_structure.ENE_fs[iband][k[4]])  #*self.WEIGHTS_OF_K[k[3]]
     for jband in range(self.fermi_nbnd_el):
      weight=el_structure.w0gauss(-ell_structure.ENE_fs[jband][self.KPQ[numk][2]]) *self.WEIGHTS_OF_K[self.KPQ[numk][1]]
      for nu in range(phh_structure.no_of_modes):
-         self.ELPH_sum[iband][k[4]][nu] += np.conjugate(ELPH[iband][jband][numk][nu])*ELPH[iband][jband][numk][nu]*weight /multik[k[4]] #*weight2
-
+         self.ELPH_sum[iband][k[4]][nu] += np.conjugate(ELPH[iband][jband][numk][nu])*ELPH[iband][jband][numk][nu]*weight /multik[k[4]] *weight2
   '''
-
 
 
  def elph_single_q_in_whole_kgrid(self,q,structure,phh_structure,ell_structure,l_or_gep):
@@ -337,22 +337,22 @@ ELPH2, structure.at,structure.e, structure.SYMM_crystal, self.SYMM_q)
   self.lambda_or_elph=l_or_gep
   self.COLORS=np.zeros(shape=(self.fermi_nbnd_el, self.nkp),dtype=complex)
   print(max([i[4] for i in self.KPOINTS]),[len(bnd) for bnd in ell_structure.ENE_fs])
-  wagi0=[[el_structure.w0gauss(-ell_structure.ENE_fs[jband][k[4]]) for numk,k in enumerate(self.KPOINTS)] for jband in range(len(self.COLORS)) ]
-  wagi=[[wagi0[jband][numk]*self.WEIGHTS_OF_K[numk] for numk in range(len(self.KPOINTS))] for jband in range(len(self.COLORS)) ]
-  dos=sum([sum(w) for w in wagi])/sum(self.WEIGHTS_OF_K)
+#  wagi0=[[el_structure.w0gauss(-ell_structure.ENE_fs[jband][k[4]]) for numk,k in enumerate(self.KPOINTS)] for jband in range(len(self.COLORS)) ]
+ # wagi=[[wagi0[jband][numk]*self.WEIGHTS_OF_K[numk] for numk in range(len(self.KPOINTS))] for jband in range(len(self.COLORS)) ]
+ # dos=sum([sum(w) for w in wagi])/sum(self.WEIGHTS_OF_K)
   if self.lambda_or_elph=='elph':
-   for numk,k in enumerate(structure.NONEQ):
+   for numk in range(self.nkp):
     for jband in range(self.fermi_nbnd_el): 
-     self.COLORS[jband][numk]= np.sum(self.ELPH_sum[jband][numk])
+     self.COLORS[jband][numk]= np.sum(self.ELPH_sum[jband][numk]) #sum over modes)
   else:
-   for numk,k in enumerate(structure.NONEQ):
+   for numk in range(self.nkp):
     for jband in range(self.fermi_nbnd_el): 
-     self.COLORS[jband][numk]+= 2.*(np.sum([(elph)/(phh_structure.FREQ[q-1][phh_structure.ORDER_OF_IRR[q-1][num]])**2*RY_TO_THZ*RY_TO_THZ if phh_structure.FREQ[q-1][phh_structure.ORDER_OF_IRR[q-1][num]]>0 else 0 for num,elph in enumerate(self.ELPH_sum[jband][numk])])) #*wagi0[jband][numk] #/dos  #abs=sqrt(real^2+im^2)
+     self.COLORS[jband][numk]= .5*(np.sum([(elph)/(phh_structure.FREQ[q-1][num])**2*RY_TO_THZ*RY_TO_THZ if phh_structure.FREQ[q-1][num]>0 else 0 for num,elph in enumerate(self.ELPH_sum[jband][numk])])) #*wagi0[jband][numk] #/dos  #abs=sqrt(real^2+im^2)
   lambda_sum=sum([sum([ self.COLORS[jband][numk]*self.WEIGHTS_OF_K[numk] for numk in range(len(self.COLORS[jband]))]) for jband in range(len(self.COLORS)) ])
-  print (q,': lambda_sum=',lambda_sum,'dos=',dos)
+  print (q,': lambda_sum=',lambda_sum) #,'dos=',dos)
 
 
-  self.COLORS=[[ bnd[k[3]] for k in structure.allk] for bnd in self.COLORS]
+  self.COLORS=[[ bnd[k[3]] for k in self.KPOINTS_all] for bnd in self.COLORS]
 
   print (q,":",len(self.COLORS),[len(i) for i in self.COLORS])
   print (q,":",len(ell_structure.ENE_fs),[len(i) for i in ell_structure.ENE_fs])
@@ -362,30 +362,4 @@ def cond(ind,nk):
  if ind[0]!=-1 and ind[0]!=nk[0] and ind[1]!=-1 and ind[1]!=nk[1] and ind[2]!=-1 and ind[2]!=nk[2]: return True
  else: return False
 
-def interpolatee(nk,allk_crystal,ENE):
- h=open('fs/vfermi.frmsf','r')
- tmp=[[float(m) for m in i.split()] for i in h.readlines()]
- h.close()
- nki=[ int(m) for m in tmp[0]]
- nkit=int(nk[0]*nk[1]*nk[2])
- nb=int(tmp[2][0])
- ENEi=np.reshape(tmp[6:6+nkt*nb],(nb,nkt))
- weights=[  [] for i in range(nki[2])  for j in range(nki[1])  for k in range(nki[0])]
- allk_crystal2=[[[ None for i in range(nki[2])] for j in range(nki[1])] for k in range(nki[0])]
- for ni,i in enumerate(allk_crystal):
-  allk_crystal2[int(i[0]*nki[0])][int(i[1]*nki[1])][int(i[2]*nki[2])]=ni
- print(ENEi[0])
- pm=[-1,1]
- for i in range(nki[0]):
-  for j in range(nki[1]):
-   for k in range(nki[2]):
-    if allk_crystal2[i][j][k]!=None: weights[i*nki[2]*nki[1]+j*nki[2]+k].append([allk_crystal2[i][j][k],1])
-    else:
-     for i2 in pm:
-      for j2 in pm:
-       for k2 in pm
-        ind=[i+i2,j+j2,k+k2]
-        if cond(ind,nk) and allk_crystal2[ind[0]][ind[1]][ind[2]]!=None: weights[i*nki[2]*nki[1]+j*nki[2]+k].append([allk_crystal2[ind[0]][ind[1]][ind[2]],1])
-        for m in weights[i*nki[2]*nki[1]+j*nki[2]+k]: m[1]=m[1]/len(weights[i*nki[2]*nki[1]+j*nki[2]+k])
- return weights,ENEi
-    
+
