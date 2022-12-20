@@ -8,9 +8,7 @@ import ph_structure
 import elph_structure
 import copy
 
-elph_structure.interpolatee()
-
-exit()
+ 
 def round_complex(y):
  prec=9
  try:
@@ -90,9 +88,10 @@ for qno in range(len(phh_structure.Q)):
  phh_structure.FREQ[qno]=np.sqrt(np.abs(a)) *RY_TO_THZ
  for ni,i in enumerate(a):
   if i<0: phh_structure.FREQ[qno][ni]=-phh_structure.FREQ[qno][ni]
- phh_structure.FREQ[qno]=sorted(phh_structure.FREQ[qno])
+
  if qno==0: 
-  for m in range(3): phh_structure.FREQ[qno][m]=0
+  indx=np.argsort(phh_structure.FREQ[qno])
+  for m in range(3): phh_structure.FREQ[qno][indx[m]]=0
  h.write(str(qno)) 
  for i in phh_structure.DYN[qno][0]:
   for j in i:
@@ -100,6 +99,14 @@ for qno in range(len(phh_structure.Q)):
   h.write('\n')
  jedynki.append([round(i/prevfreq[ni],4) for ni,i in enumerate(sorted(phh_structure.FREQ[qno]))])
  for i in jedynki[-1]:  h.write(str(i)+'\n')
+ for i in range(3):
+  for na in range(phh_structure.nat):
+   mu=3*(na)+i
+   for j in range(3):
+    for nb in range(phh_structure.nat):
+     nu=3*(nb)+j
+     dyn [mu][nu] = dyn [mu][nu] * AMU_RY* ( amass[na]*amass[nb])**0.5
+
  #if sum(jedynki[-1])!=len(jedynki[-1]): print(structure_new.SYMM_crystal,phh_structure.Q_crystal[qno],phh_structure.Q[qno])
 h.close()
  #print(round_complex(a[0]*RY_TO_THZ*RY_TO_THZ))
