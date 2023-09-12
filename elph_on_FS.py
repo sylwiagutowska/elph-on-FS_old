@@ -9,6 +9,13 @@ import elph_structure
 import copy
 
  
+ELECTRONMASS_SI  = 9.10938215e-31   # Kg
+AMU_SI           = 1.660538782e-27  #Kg
+AMU_AU           = AMU_SI / ELECTRONMASS_SI
+AMU_RY           = AMU_AU / 2. #=911.44 
+RY_TO_THZ=3289.8449
+
+
 def round_complex(y):
  prec=9
  try:
@@ -30,8 +37,8 @@ sstructure.make_kgrid()
 
 el_structure=el_structure.el_structure(sstructure)
 el_structure.read_el_structure()
-
-
+#el_structure.find_ef()
+#exit()
 phh_structure=ph_structure.ph_structure(sstructure)
 phh_structure.read_ph_structure()
 #ph_structure.check_symm_of_q(structure)
@@ -43,16 +50,12 @@ basic_structure=sstructure
 
  #check if composing dynmat works - WORKS! GIVES PROPER omega^2
 
-ELECTRONMASS_SI  = 9.10938215e-31   # Kg
-AMU_SI           = 1.660538782e-27  #Kg
-AMU_AU           = AMU_SI / ELECTRONMASS_SI
-AMU_RY           = AMU_AU / 2. #=911.44
-RY_TO_THZ=3289.8449
 
 #pb_mass=207.2 #*(9.3975038) #**2
 #pbbi_mass=207.2 #*6.6485187 #**2
-amass=basic_structure.at_masses #[pbbi_mass,pbbi_mass]
+amass=np.array(basic_structure.at_masses)*AMU_RY #[pbbi_mass,pbbi_mass]
 print(amass)
+
 #print(phh_structure.Q_crystal)
 #sstructure.calc_irt()
 #print(sstructure.irt)
@@ -71,24 +74,32 @@ for qno in range(len(phh_structure.Q)):
      sstructure.SYMM_crystal, structure_new.SYMM_crystal,
      structure_new.irt,structure_new.rtau,phh_structure.Q_crystal_orig[qno] )
 # print(round_complex(dyn))
+ dyn=np.round(dyn,decimals=14)
+ 
  for i in range(3):
   for na in range(phh_structure.nat):
    mu=3*(na)+i
    for j in range(3):
     for nb in range(phh_structure.nat):
      nu=3*(nb)+j
-     dyn [mu][nu] = dyn [mu][nu] / ( amass[na]*amass[nb])**0.5
+     dyn [nu][mu] = dyn [nu][mu] / ( amass[na]*amass[nb])**0.5
+ 
 
- dyn=np.round(dyn,decimals=10)
- dyn=dyn/AMU_RY
- phh_structure.DYN[qno]=[dyn]
- a=np.linalg.eigvals(dyn)
-# phh_structure.DYN[qno]=[np.transpose(a[1])]
+ a=np.linalg.eig(dyn)
+ dyn=a[1]
  prevfreq=phh_structure.FREQ[qno]
- phh_structure.FREQ[qno]=np.sqrt(np.abs(a)) *RY_TO_THZ
- for ni,i in enumerate(a):
-  if i<0: phh_structure.FREQ[qno][ni]=-phh_structure.FREQ[qno][ni]
-
+ phh_structure.FREQ[qno]=np.sqrt(np.abs(a[0])) 
+ for ni,i in enumerate(a[0]):
+  if i<0: phh_structure.FREQ[qno][ni]=0 #-phh_structure.FREQ[qno][ni]
+  
+ for nu in range(3*phh_structure.nat):
+        for mu in range(3*phh_structure.nat):
+         na=int(mu/3)
+  #       print(amass[na]**.5)
+         dyn[nu][mu]= dyn[nu][mu] /   (amass[na]**.5)
+ 
+ #exit()
+ phh_structure.DYN[qno]=[np.transpose(dyn)]
  if qno==0: 
   indx=np.argsort(phh_structure.FREQ[qno])
   for m in range(3): phh_structure.FREQ[qno][indx[m]]=0
@@ -97,8 +108,9 @@ for qno in range(len(phh_structure.Q)):
   for j in i:
    h.write(str(j)+' ')
   h.write('\n')
- jedynki.append([round(i/prevfreq[ni],4) for ni,i in enumerate(sorted(phh_structure.FREQ[qno]))])
+ jedynki.append([round(i/(prevfreq[ni]/RY_TO_THZ),4) for ni,i in enumerate(sorted(phh_structure.FREQ[qno]))])
  for i in jedynki[-1]:  h.write(str(i)+'\n')
+ '''
  for i in range(3):
   for na in range(phh_structure.nat):
    mu=3*(na)+i
@@ -106,7 +118,7 @@ for qno in range(len(phh_structure.Q)):
     for nb in range(phh_structure.nat):
      nu=3*(nb)+j
      dyn [mu][nu] = dyn [mu][nu] * AMU_RY* ( amass[na]*amass[nb])**0.5
-
+ '''
  #if sum(jedynki[-1])!=len(jedynki[-1]): print(structure_new.SYMM_crystal,phh_structure.Q_crystal[qno],phh_structure.Q[qno])
 h.close()
  #print(round_complex(a[0]*RY_TO_THZ*RY_TO_THZ))
@@ -116,9 +128,11 @@ h.close()
 for ni,i in enumerate(jedynki):
  if sum(i)!=len(i): 
   print('Q',ni+1,phh_structure.Q_crystal[ni],'wrong! freq/freq=',i)
+  if ni!=0: print(phh_structure.FREQ[qno])
  # print(phh_structure.FREQ[ni])
 #print(sstructure.e)
 #exit()
+
 
 elphh_structure=elph_structure.elph_structure(phh_structure,'lambda')
 

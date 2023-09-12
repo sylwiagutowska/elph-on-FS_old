@@ -24,6 +24,7 @@ class structure():
   self.irt=[] #we rotate atom by sym and check which atom he becomes
   self.rtau=[] #pos of atoms rotated by sym
   self.tmp_dir='../tmp_dir'
+  self.scfout='../scfout'
  
 
  def calc_noneq_cryst(self):
@@ -234,7 +235,7 @@ class structure():
    for j in self.allk:
     if j[3]==i:
      WK[i]+=1
-  return WK
+  return WK #/len(self.allk)
 
  def make_kgrid(self,q=-1):
   print(' make whole kgrid')
@@ -246,14 +247,16 @@ class structure():
   # print nq
 #   nq2=[ round(sum([nq[m]*self.e[m][m2] for m in range(3)]),PRECIS)\
 #                      for m2 in range(3)] #transform  to cartesian coordinates
+   nq2=np.round(np.multiply(nq[:3],self.no_of_kpoints))
    for ns,sym in enumerate(self.SYMM_crystal):
-    x=np.dot(np.transpose(sym),nq[:3]) #[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
+    x=np.round(np.dot(np.transpose(sym),nq2[:3])) #[sum([sym[m1][m2]*nq[m2] for m2 in range(3)]) for m1 in range(3)]
     for mm in range(3):
-      while x[mm]>=1: x[mm]= x[mm]-1.
-      while x[mm]<0: x[mm]= x[mm]+1.
-    x=np.round(x,PRECIS-1)
+      while x[mm]>=self.no_of_kpoints[mm]: x[mm]= x[mm]-self.no_of_kpoints[mm]
+      while x[mm]<0: x[mm]= x[mm]+self.no_of_kpoints[mm]
+    x=np.round(x/self.no_of_kpoints,PRECIS)
     k_point2=list(np.round(np.dot(x,self.e),PRECIS-1)) #[round(kk,PRECIS) for kk in 
                  #x[0]*self.e[0]+x[1]*self.e[1]+x[2]*self.e[2]] #from crystal to cartesian
+  #  x=np.round(np.multiply(x,self.no_of_kpoints))
     allk2.append(k_point2)
     allk2[-1].append(nq[3])
     allk2[-1].append(no)
@@ -273,12 +276,17 @@ class structure():
   for ni,i in enumerate(self.allk):
    self.allk_in_crystal_coordinates[ni][3]=i[3]
 
+  #for i in self.allk_in_crystal_coordinates: 
+  # for m in range(3):
+  #  i[m]=np.round(i[m]/self.no_of_kpoints[m],PRECIS-2)
+
 
   #calc weights of k
   self.WK=self.calc_weight_of_k()
+
   h=open('kpoints'+str(q)+'.dat','w')
   h.write(str(len(self.SYMM_crystal))+'\n')
-  for ni,i in enumerate(self.allk_in_crystal_coordinates):
+  for ni,i in enumerate(self.NONEQ_cryst):
    for j in range(4):
     h.write(str(i[j])+' ')
    h.write('\n')
@@ -340,7 +348,7 @@ class structure():
 #      SYMM2.append(sym)
 #      SYMM2_crystal.append(self.SYMM_crystal[si])
   print(q_no,q_cryst,':',len(founded),'operations of symmetry')
-  if len(founded)!=no_of_s_q: raise ValueError(q_no,' no of sym is wront', len(founded), no_of_s_q)
+  if len(founded)!=no_of_s_q: raise ValueError(q_no,' no of sym is wrong', len(founded), no_of_s_q)
   self.SYMM=[self.SYMM[si] for si in founded]
   self.SYMM_crystal=[self.SYMM_crystal[si] for si in founded]
   self.FRACTIONAL_TRANSLATION_crystal=[self.FRACTIONAL_TRANSLATION_crystal[si] for si in founded]
@@ -350,7 +358,7 @@ class structure():
  def find_k_plus_q(self,k,allk,allk_cryst,q_cryst):
  # print(allk_cryst)
   kpq_no=-2
-  einv=np.linalg.inv(np.transpose(self.e))
+  #einv=np.linalg.inv(np.transpose(self.e))
   k2=k
   q2=q_cryst
   kpq0=np.round([k2[i]+q2[i] for i in range(3)],PRECIS-1) #in cryst coords
@@ -369,12 +377,12 @@ class structure():
    kpq2=np.round(kpq2,PRECIS-2)
    for ki in allk_cryst:
       if found==1: break
-      if kpq2[0]==np.round(ki[0],PRECIS-2) and kpq2[1]==np.round(ki[1],PRECIS-2) and kpq2[2]==np.round(ki[2],PRECIS-2):
+      if kpq2[0]==ki[0] and kpq2[1]==ki[1] and kpq2[2]==ki[2]:
             kpq_no=ki[3]
             kpq_no_in_basic=ki[4]
             found=1
             break
-  if kpq_no==-2: raise ValueError(q2,k2,kpq0,kpq2,' kpq not found')
+  if kpq_no==-2: raise ValueError(q2,k2,kpq0,kpq2,' kpq not found',allk_cryst)
   return [kpq2,kpq_no,kpq_no_in_basic]
 
  def find_newkpoints_in_old_list(self,old_allk):

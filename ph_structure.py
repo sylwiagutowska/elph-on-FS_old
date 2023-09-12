@@ -339,7 +339,7 @@ def if_has_equivalents(irt,at):
 def impose_asr(dyn,nat,irt):
   for m in range(nat): 
    if not if_has_equivalents(irt,m):
-    print('asr')
+   # print('asr')
     dyn=asr(nat,m,dyn)
   return dyn
 
@@ -347,7 +347,7 @@ def symmetrize(nat,pattern,dyn,at0,bg,s,s_of_q,irt,rtau,q ):
   #print(rtau)
   #rtau= input: the R associated at each  ,  irt (48, nat)=input: the rotated of each atom [here irt[nat][len of s_of_q], isym=s_of_q=input: the small group of q
   at=np.round(np.linalg.inv(np.transpose(bg)),PRECIS) #/2/np.pi
-#  if sum(np.abs(q))==0: dyn=impose_asr(dyn,nat,irt)
+ # if sum(np.abs(q))==0: dyn=impose_asr(dyn,nat,irt)
   phi=dyn_pattern_to_cart(nat, pattern, dyn)
   for na in range(nat):
    for nb in range(nat):
